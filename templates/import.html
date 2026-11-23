@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>Importar registro histórico</h1>
+  <p>Selecciona un Excel con columnas A–S. Antes de guardar se mostrará una previsualización y las cotizaciones duplicadas serán omitidas automáticamente. Las fórmulas se leen como valores calculados guardados por Excel.</p>
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{csrf}}">
+    <p><input type="file" name="file" accept=".xlsx" required></p>
+    <button>Revisar importación</button>
+  </form>
+</section>
+{% endblock %}

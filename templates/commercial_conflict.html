@@ -1,0 +1,4 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel"><h1>El detalle comercial cambió</h1><p class="danger">Otra persona guardó una versión más reciente. Tus líneas no fueron sobrescritas.</p><p>Tu envío contenía {{submitted_items|length}} líneas por un total de {{submitted_commercial.currency}} {{format_amount(submitted_commercial.total,submitted_commercial.currency)}}.</p><a class="btn" href="{{url_for('commercial.commercial_form',quote_id=q.id)}}">Abrir versión actual</a></section>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>Previsualizar importación</h1>
+  <p><b>Archivo:</b> {{batch.source_name}}</p>
+  <div class="toolbar">
+    <span class="pill open">{{importable}} nuevas</span>
+    <span class="pill open">{{reconciliations}} números por actualizar</span>
+    <span class="pill duplicate">{{duplicates}} duplicadas</span>
+    <span class="pill duplicate">{{invalid}} inválidas</span>
+    <span class="muted">{{total}} filas detectadas en total</span>
+  </div>
+  <p class="muted">Las duplicadas conservan sus datos; cuando corresponde, se actualizará su número desde la columna C. Las inválidas se omitirán. Se muestran hasta {{batch_rows|length}} filas para revisión.</p>
+</section>
+<section class="panel scroll">
+  <table><thead><tr><th>Resultado</th><th>N° original</th><th>Cliente</th><th>Descripción</th><th>RFQ</th><th>Fecha</th><th>Estado</th></tr></thead><tbody>
+  {% for row in batch_rows %}<tr><td>{% if row.invalid %}<span class="pill duplicate" title="{{row.error}}">Inválida (fila {{row.row_number}}): {{row.error}}</span>{% elif row.reconcile %}<span class="pill open">Actualizar número</span>{% else %}<span class="pill {{'duplicate' if row.duplicate else 'open'}}">{{'Duplicada' if row.duplicate else 'Nueva'}}</span>{% endif %}</td><td>{{row.legacy_number or '—'}}</td><td>{{row.data.cliente}}</td><td>{{row.data.descripcion}}</td><td>{{row.data.rfq}}</td><td>{{row.data.fecha|local_date if row.data.fecha else '—'}}</td><td>{{row.data.estado}}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+<section class="panel toolbar">
+  <form method="post" action="{{url_for('admin.import_cancel',batch_id=batch.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><button class="secondary">Cancelar</button></form>
+  <form method="post" action="{{url_for('admin.import_confirm',batch_id=batch.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><button {{'disabled' if importable==0 and reconciliations==0 else ''}}>Confirmar importación</button></form>
+</section>
+{% endblock %}

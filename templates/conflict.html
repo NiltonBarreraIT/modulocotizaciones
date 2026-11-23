@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>La cotización fue modificada</h1>
+  <p class="danger">Otra persona guardó cambios mientras este formulario estaba abierto. No se sobrescribió ninguna información.</p>
+  <p>Compara ambas versiones y vuelve a editar la versión actual para integrar los cambios necesarios.</p>
+  <a class="btn" href="{{url_for('quotes.edit',quote_id=q.id)}}">Abrir versión actual</a>
+</section>
+<div class="compare">
+  <section class="panel"><h2>Versión actual ({{q.version}})</h2>{% for key,label,kind in fields %}<p><label>{{label}}</label><span class="value-new">{{q.d.get(key,'') or '—'}}</span></p>{% endfor %}</section>
+  <section class="panel"><h2>Tus cambios no guardados</h2>{% for key,label,kind in fields %}<p><label>{{label}}</label><span class="value-old">{{submitted.get(key,'') or '—'}}</span></p>{% endfor %}</section>
+</div>
+{% endblock %}

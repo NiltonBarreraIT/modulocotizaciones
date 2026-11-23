@@ -1,0 +1,2 @@
+ALTER TABLE quote_items
+ADD COLUMN details TEXT NOT NULL DEFAULT '';

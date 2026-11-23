@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <div class="toolbar"><div><h1>Ofertas pendientes de aprobación</h1><p class="muted">Ofertas enviadas a revisión por el equipo cotizador.</p></div><span class="pill {{'overdue' if pending else 'open'}}">{{pending|length}} pendiente(s)</span></div>
+</section>
+<section class="panel">
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Solicitud</th><th>Cliente</th><th>Vendedor</th><th>Cotizador</th><th>Solicitada</th><th>Versión</th><th>Total neto</th><th>Acciones</th></tr></thead>
+      <tbody>
+      {% for q in pending %}
+        <tr>
+          <td><a href="{{url_for('quotes.detail',quote_id=q.id)}}"><b>{{q.number}}</b></a></td>
+          <td>{{q.d.cliente or '—'}}</td>
+          <td>{{q.seller_name}}</td>
+          <td>{{q.estimator_name}}</td>
+          <td>{{q.requested_at|local_datetime if q.requested_at else '—'}}</td>
+          <td>{{q.version}}</td>
+          <td class="money">{{q.currency or ''}} {{format_amount(q.total,q.currency) if q.total else '—'}}</td>
+          <td><div class="item-actions"><form method="post" action="{{url_for('commercial.workflow',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="approve"><button>Aprobar</button></form><form method="post" action="{{url_for('commercial.workflow',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="reject"><input name="reason" maxlength="1000" placeholder="Motivo del rechazo" required><button class="secondary">Rechazar</button></form></div></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8">No hay ofertas pendientes de aprobación.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

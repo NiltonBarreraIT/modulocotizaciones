@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>Detalle comercial · {{q.number}}</h1>
+  <p class="muted">Guardar genera una nueva versión y devuelve la aprobación a borrador.</p>
+  <form method="post" data-commercial-form>
+    <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{q.version}}">
+    <div class="grid">
+      <div><label>Moneda</label><select name="currency" data-currency>{% for currency in currencies %}<option {{'selected' if commercial.currency==currency else ''}}>{{currency}}</option>{% endfor %}</select></div>
+      <div><label>Descuento global %</label><input type="number" min="0" max="100" step="0.01" name="global_discount" value="{{commercial.global_discount}}" data-global-discount></div>
+      <div><label>Vigencia en días</label><input type="number" min="1" max="3650" name="validity_days" value="{{commercial.validity_days}}"></div>
+      <div><label>Condiciones de pago</label><textarea name="payment_terms" rows="2">{{commercial.payment_terms}}</textarea></div>
+      <div><label>Notas para la cotización</label><textarea name="notes" rows="2">{{commercial.notes}}</textarea></div>
+      <div><label>Plazo de entrega</label><textarea name="delivery_time" rows="2" placeholder="Ej.: 4 semanas desde la recepción de la orden de compra">{{commercial.delivery_time}}</textarea></div>
+      <div class="wide"><label>Alcance de suministros</label><textarea name="supply_scope" rows="3" maxlength="4000" placeholder="Ej.: Suministro de 5 transmisores de pH">{{commercial.supply_scope}}</textarea></div>
+      <div class="wide"><h2>Colaboración y trazabilidad</h2></div>
+      <div><label>Negocio compartido con</label><select name="shared_user_id"><option value="">Sin negocio compartido</option>{% for shared_user in shared_sellers %}<option value="{{shared_user.id}}" {{'selected' if commercial.shared_user_id==shared_user.id else ''}}>{{shared_user.display_name}}{{' (' + shared_user.email + ')' if shared_user.email and shared_user.display_name != shared_user.email else ''}}</option>{% endfor %}</select><p class="field-help muted">Seleccione al vendedor que comparte el negocio.</p></div>
+      <div><label>Porcentaje compartido %</label><input type="number" min="0.01" max="100" step="0.01" name="shared_percent" value="{{commercial.shared_percent}}" placeholder="Ej.: 50,00"><p class="field-help muted">Obligatorio al seleccionar un negocio compartido.</p></div>
+      <div><label>Apoyo Técnico PM</label><select name="technical_support_user_id"><option value="">Sin asignar</option>{% for technical_user in technical_users %}<option value="{{technical_user.id}}" {{'selected' if commercial.technical_support_user_id==technical_user.id else ''}}>{{technical_user.display_name}}{{' (' + technical_user.email + ')' if technical_user.email and technical_user.display_name != technical_user.email else ''}}</option>{% endfor %}</select><p class="field-help muted">Usuario que brindó apoyo técnico al negocio.</p></div>
+      <div><label>% utilidad</label><input type="number" min="0" max="100" step="0.01" name="profit_percent" value="{{commercial.profit_percent}}" placeholder="Ingreso manual"></div>
+      <div><label>Utilidad US$</label><input type="text" inputmode="decimal" name="profit_usd" value="{{commercial.profit_usd}}" placeholder="Ingreso manual"></div>
+    </div>
+    <h2>Líneas</h2>
+    <div class="commercial-lines-wrap"><table class="commercial-lines-table"><thead><tr><th>Tipo</th><th>Descripción</th><th>Detalle técnico / nota</th><th>Cantidad</th><th>Precio unitario</th><th>Desc. %</th><th>Total</th><th></th></tr></thead><tbody data-items>
+      {% for item in items %}<tr data-item><td><select name="item_kind"><option value="producto" {{'selected' if item.kind=='producto' else ''}}>Producto</option><option value="servicio" {{'selected' if item.kind=='servicio' else ''}}>Servicio</option></select></td><td><input name="item_description" value="{{item.description}}" maxlength="500"></td><td class="item-details"><textarea name="item_details" rows="4" maxlength="4000" placeholder="Una especificación por línea">{{item.details}}</textarea></td><td><input type="number" min="0.0001" step="any" name="item_quantity" value="{{item.quantity}}" data-quantity></td><td><input type="text" inputmode="decimal" name="item_unit_price" value="{{format_amount(item.unit_price,commercial.currency)}}" data-price></td><td><input type="number" min="0" max="100" step="0.01" name="item_discount" value="{{item.discount_percent}}" data-discount></td><td class="money" data-line-total>{{format_amount(item.line_total,commercial.currency)}}</td><td><button type="button" class="secondary" data-remove-item>Quitar</button></td></tr>{% endfor %}
+      {% if not items %}<tr data-item><td><select name="item_kind"><option value="producto">Producto</option><option value="servicio">Servicio</option></select></td><td><input name="item_description" maxlength="500"></td><td class="item-details"><textarea name="item_details" rows="4" maxlength="4000" placeholder="Una especificación por línea"></textarea></td><td><input type="number" min="0.0001" step="any" name="item_quantity" value="1" data-quantity></td><td><input type="text" inputmode="decimal" name="item_unit_price" value="0" data-price></td><td><input type="number" min="0" max="100" step="0.01" name="item_discount" value="0" data-discount></td><td class="money" data-line-total>0</td><td><button type="button" class="secondary" data-remove-item>Quitar</button></td></tr>{% endif %}
+    </tbody></table></div>
+    <template data-item-template><tr data-item><td><select name="item_kind"><option value="producto">Producto</option><option value="servicio">Servicio</option></select></td><td><input name="item_description" maxlength="500"></td><td class="item-details"><textarea name="item_details" rows="4" maxlength="4000" placeholder="Una especificación por línea"></textarea></td><td><input type="number" min="0.0001" step="any" name="item_quantity" value="1" data-quantity></td><td><input type="text" inputmode="decimal" name="item_unit_price" value="0" data-price></td><td><input type="number" min="0" max="100" step="0.01" name="item_discount" value="0" data-discount></td><td class="money" data-line-total>0</td><td><button type="button" class="secondary" data-remove-item>Quitar</button></td></tr></template>
+    <p><button type="button" class="secondary" data-add-item>+ Agregar línea</button></p>
+    <div class="commercial-total" data-live-totals>Subtotal: 0.00 · Descuento: 0.00 · Total neto: 0.00</div>
+    <p><button>Guardar detalle comercial</button> <a class="btn secondary" href="{{url_for('quotes.detail',quote_id=q.id)}}">Cancelar</a></p>
+  </form>
+</section>
+{% endblock %}

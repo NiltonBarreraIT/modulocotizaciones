@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>{{title}}</h1>
+  {% if is_request_form %}
+  <p class="muted">Registra lo solicitado por el cliente. La solicitud quedará pendiente para que un cotizador la tome.</p>
+  {% else %}
+  <p class="muted">Cliente y descripción son obligatorios. Fecha de cotización, montos, utilidad y estado se administran desde el flujo y el detalle comercial.</p>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{csrf}}">
+    {% if q %}<input type="hidden" name="version" value="{{q.version}}">{% endif %}
+    {% if is_request_form %}
+    <div class="grid">
+      <div>
+        <label for="solicitud">Fecha de solicitud</label>
+        <input id="solicitud" name="solicitud" type="date" value="{{values.get('solicitud','')}}" required>
+      </div>
+      <div>
+        <label for="vendedor-display">Vendedor</label>
+        <input id="vendedor-display" value="{{values.get('vendedor',me.username)}}" readonly>
+        <p class="muted field-help">Se obtiene del usuario conectado.</p>
+      </div>
+      <div>
+        <label for="cliente">Cliente</label>
+        <input id="cliente" name="cliente" value="{{values.get('cliente','')}}" maxlength="200" required>
+      </div>
+      <div>
+        <label for="due-date">Fecha límite de entrega (opcional)</label>
+        <input id="due-date" name="due_date" type="date" min="{{values.get('solicitud','')}}" value="{{values.get('due_date','')}}">
+        <p class="muted field-help">Si no hay un compromiso de entrega, puede quedar vacía.</p>
+      </div>
+      <div class="wide">
+        <label for="descripcion">Requerimiento o comentarios</label>
+        <textarea id="descripcion" name="descripcion" rows="8" maxlength="5000" required placeholder="Describe todo lo que el cliente necesita cotizar">{{values.get('descripcion','')}}</textarea>
+      </div>
+      {% if not q %}
+      <div class="wide">
+        <label for="file">Adjunto inicial (opcional)</label>
+        <input id="file" type="file" name="file" accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg">
+        <p class="muted field-help">PDF, Excel, Word o imagen. Máximo 10 MB.</p>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="grid">
+      {% for key,label,kind in fields %}
+      <div class="{{'wide' if kind=='textarea' else ''}}">
+        <label for="{{key}}">{{label}}</label>
+        {% if key in ['fecha','clp','usd','eur','margen','utilidad_usd','estado'] %}
+          <input id="{{key}}" name="{{key}}" type="{{'date' if kind=='date' else 'number' if kind=='number' else 'text'}}" value="{{values.get(key,'')}}" readonly>
+        {% elif kind=='textarea' %}
+          <textarea id="{{key}}" name="{{key}}" rows="3" {{'required' if key in ['cliente','descripcion'] else ''}}>{{values.get(key,'')}}</textarea>
+        {% elif kind=='select' %}
+          <select id="{{key}}" name="{{key}}"><option value="">Seleccionar</option>{% for status in allowed_statuses %}<option value="{{status}}" {{'selected' if values.get(key)==status else ''}}>{{status}}</option>{% endfor %}</select>
+        {% else %}
+          <input id="{{key}}" name="{{key}}" type="{{kind}}" {% if kind=='number' %}step="any" min="0"{% endif %}{% if key in ['area','fabrica'] %} list="catalog-{{key}}"{% endif %} value="{{values.get(key,'')}}" {{'required' if key=='cliente' else ''}}>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% for kind,options in catalogs.items() %}<datalist id="catalog-{{kind}}">{% for option in options %}<option value="{{option}}"></option>{% endfor %}</datalist>{% endfor %}
+    <div class="grid" style="margin-top:17px">
+      <div>
+        <label for="due-date">Fecha límite de entrega (opcional)</label>
+        <input id="due-date" name="due_date" type="date" min="{{values.get('solicitud','')}}" value="{{values.get('due_date','')}}">
+      </div>
+    </div>
+    {% endif %}
+    <p><button>{{'Registrar solicitud' if is_request_form and not q else 'Guardar cambios'}}</button> <a class="btn secondary" href="{{url_for('quotes.index')}}">Cancelar</a></p>
+  </form>
+</section>
+{% endblock %}

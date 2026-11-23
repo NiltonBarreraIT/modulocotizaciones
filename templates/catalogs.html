@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>Catálogos maestros</h1>
+  <p class="muted">Administra las opciones reutilizables de la plataforma. Desactivar una opción la oculta en nuevas selecciones sin modificar las cotizaciones históricas.</p>
+</section>
+{% for kind,title in catalog_types.items() %}
+<section class="panel">
+  <div class="toolbar">
+    <div><h2>{{title}}</h2><p class="muted">Opciones disponibles en Datos generales.</p></div>
+    <form method="post" action="{{url_for('admin.catalogs')}}" class="item-actions">
+      <input type="hidden" name="csrf" value="{{csrf}}">
+      <input type="hidden" name="kind" value="{{kind}}">
+      <div><label for="new-{{kind}}">Nueva opción</label><input id="new-{{kind}}" name="value" maxlength="120" required placeholder="Agregar {{title|lower}}"></div>
+      <button>Agregar</button>
+    </form>
+  </div>
+  {% if catalogs[kind] %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+      <tbody>{% for entry in catalogs[kind] %}
+        <tr>
+          <td><input form="catalog-{{entry.id}}" name="value" value="{{entry.value}}" maxlength="120" required></td>
+          <td><select form="catalog-{{entry.id}}" name="active"><option value="1" {{'selected' if entry.active else ''}}>Activa</option><option value="0" {{'selected' if not entry.active else ''}}>Inactiva</option></select></td>
+          <td><form id="catalog-{{entry.id}}" method="post" action="{{url_for('admin.update_catalog',entry_id=entry.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><button>Guardar</button></form></td>
+        </tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p class="muted">Todavía no hay opciones registradas.</p>{% endif %}
+</section>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Tablero comercial</h1>
+<div class="cards">
+  {% if me.role=='admin' %}<a class="card overdue-card" href="{{url_for('dashboard.approvals')}}"><span class="muted">Por aprobar</span><strong>{{pending_approval_count}}</strong></a>{% endif %}
+  <a class="card" href="{{url_for('quotes.index',request_status='pendiente_asignacion')}}"><span class="muted">Sin tomar</span><strong>{{pending_count}}</strong></a>
+  <div class="card"><span class="muted">En gestión</span><strong>{{in_progress_count}}</strong></div>
+  <a class="card overdue-card" href="{{url_for('quotes.index',timing='atrasadas')}}"><span class="muted">Atrasadas</span><strong>{{overdue_count}}</strong></a>
+  <a class="card" href="{{url_for('quotes.index',request_status='entregada')}}"><span class="muted">Entregadas</span><strong>{{delivered_count}}</strong></a>
+</div>
+{% if currency_totals %}<div class="cards"><div class="card"><span class="muted">Solicitudes visibles</span><strong>{{total_quotes}}</strong></div>{% for currency,total in currency_totals.items() %}<div class="card"><span class="muted">Total {{currency}}</span><strong>{{format_amount(total,currency)}}</strong></div>{% endfor %}</div>{% endif %}
+
+{% if overdue %}
+<section class="panel">
+  <div class="toolbar"><div><h2>Requieren atención</h2><p class="muted">Solicitudes sin tomar fuera del objetivo o con fecha límite vencida.</p></div><a class="btn secondary" href="{{url_for('quotes.index',timing='atrasadas')}}">Ver todas</a></div>
+  <div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Cotizador</th><th>Estado</th><th>Antigüedad</th><th>Motivo</th></tr></thead><tbody>
+  {% for q in overdue %}<tr><td><a href="{{url_for('quotes.detail',quote_id=q.id)}}"><b>{{q.number}}</b></a></td><td>{{q.d.cliente}}</td><td>{{q.estimator_name or 'Sin asignar'}}</td><td>{{request_status_labels.get(q.request_status,q.request_status)}}</td><td>{{q.age_label}}</td><td><span class="pill overdue">{{q.overdue_reason}}</span></td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endif %}
+
+<div class="compare">
+  <section class="panel"><h2>Solicitudes</h2><table><thead><tr><th>Etapa</th><th>Cantidad</th></tr></thead><tbody>{% for status,count in request_counts.items() %}<tr><td class="workflow">{{status}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Sin datos</td></tr>{% endfor %}</tbody></table></section>
+  <section class="panel"><h2>Estado comercial</h2><table><thead><tr><th>Estado</th><th>Cantidad</th></tr></thead><tbody>{% for status,count in status_counts.items() %}<tr><td>{{status}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Sin datos</td></tr>{% endfor %}</tbody></table></section>
+</div>
+
+<section class="panel"><h2>Actividad reciente</h2><div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Cotizador</th><th>Estado solicitud</th><th>Plazo</th><th>Total</th></tr></thead><tbody>{% for q in recent %}<tr><td><a href="{{url_for('quotes.detail',quote_id=q.id)}}">{{q.number}}</a></td><td>{{q.d.cliente}}</td><td>{{q.estimator_name or 'Sin asignar'}}</td><td class="workflow">{{request_status_labels.get(q.request_status,q.request_status)}}</td><td>{% if q.is_overdue %}<span class="pill overdue">Atrasada</span>{% else %}{{q.age_label}}{% endif %}</td><td>{{q.currency or ''}} {{format_amount(q.total,q.currency) if q.total else ''}}</td></tr>{% else %}<tr><td colspan="6">Sin solicitudes.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

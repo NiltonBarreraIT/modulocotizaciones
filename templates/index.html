@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <div class="toolbar">
+    <div>
+      <h1>Solicitudes de cotización</h1>
+      <p class="muted">{{total}} resultado(s). Edición disponible durante 24 horas desde el último guardado del usuario.</p>
+    </div>
+    <a class="btn" href="{{url_for('quotes.create')}}">+ Nueva solicitud</a>
+  </div>
+  <form method="get" class="quote-filter-form">
+    <div class="filter-row filter-main-row">
+      <div><label for="q">Búsqueda general</label><input id="q" name="q" placeholder="Número, cliente o descripción" value="{{filters.q}}"></div>
+      <div><label for="cliente">Cliente</label><input id="cliente" name="cliente" placeholder="Nombre del cliente" value="{{filters.cliente}}"></div>
+      <div><label for="vendedor">Vendedor</label><input id="vendedor" name="vendedor" placeholder="Nombre del vendedor" value="{{filters.vendedor}}"></div>
+      <div><label for="cotizador">Cotizador</label><input id="cotizador" name="cotizador" placeholder="Nombre del cotizador" value="{{filters.cotizador}}"></div>
+    </div>
+    <div class="filter-row filter-status-row">
+      <div><label for="request-status">Estado solicitud</label><select id="request-status" name="request_status"><option value="">Todos</option>{% for value,label in request_status_labels.items() %}<option value="{{value}}" {{'selected' if filters.request_status==value else ''}}>{{label}}</option>{% endfor %}</select></div>
+      <div><label for="estado-filter">Estado comercial</label><select id="estado-filter" name="estado"><option value="">Todos</option>{% for status in statuses %}<option value="{{status}}" {{'selected' if filters.estado==status else ''}}>{{status}}</option>{% endfor %}</select></div>
+      <div><label for="timing">Situación</label><select id="timing" name="timing"><option value="">Todas</option><option value="atrasadas" {{'selected' if filters.timing=='atrasadas' else ''}}>Atrasadas</option></select></div>
+      <fieldset class="date-filter-group"><legend>Fecha de solicitud</legend><div class="date-filter-inputs"><div><label for="desde">Desde</label><input id="desde" type="date" name="desde" value="{{filters.desde}}"></div><div><label for="hasta">Hasta</label><input id="hasta" type="date" name="hasta" value="{{filters.hasta}}"></div></div></fieldset>
+      <div class="filter-actions"><button>Filtrar</button><a class="btn secondary" href="{{url_for('quotes.index')}}">Limpiar</a></div>
+    </div>
+  </form>
+</section>
+<section class="panel scroll">
+  <table>
+    <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Requerimiento</th><th>Vendedor</th><th>Cotizador</th><th>Estado solicitud</th><th>Estado comercial</th><th>Antigüedad / plazo</th><th>Acciones</th></tr></thead>
+    <tbody>
+    {% for q in quotes %}
+      <tr>
+        <td><a href="{{url_for('quotes.detail',quote_id=q.id)}}"><b>{{q.number}}</b></a></td>
+        <td>{{q.d.solicitud|local_date if q.d.solicitud else '—'}}</td><td>{{q.d.cliente}}</td><td>{{q.d.descripcion[:90]}}</td><td>{{q.d.vendedor}}</td><td>{{q.estimator_name or 'Sin asignar'}}</td><td><span class="pill workflow">{{q.request_status_label}}</span></td><td><span class="pill {{'open' if q.d.estado=='Adjudicada' else 'lock' if q.d.estado in ['Perdida','Anulada'] else 'workflow'}}">{{q.d.estado or 'Sin estado'}}</span></td><td><b>{{q.age_label}}</b>{% if q.is_overdue %}<br><span class="pill overdue" title="{{q.overdue_reason}}">Atrasada</span>{% elif q.target_date %}<br><span class="muted">Límite {{q.target_date|local_date}}</span>{% elif q.target_at %}<br><span class="muted">Tomar antes de {{q.target_at|local_datetime}}</span>{% endif %}</td>
+        <td>{% if me.role=='cotizador' and q.request_status=='pendiente_asignacion' %}<form method="post" action="{{url_for('quotes.take_request',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><button>Tomar solicitud</button></form>{% else %}<span class="pill {{'open' if can_edit(q,me) else 'lock'}}">{{'Editable' if can_edit(q,me) else 'Asignada' if q.estimator_name else 'Bloqueada'}}</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="10">No hay solicitudes para los filtros seleccionados.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="pagination">
+    <div>{% if previous_url %}<a class="btn secondary" href="{{previous_url}}">← Anterior</a>{% endif %}</div>
+    <span>Página {{page}} de {{total_pages}}</span>
+    <div>{% if next_url %}<a class="btn secondary" href="{{next_url}}">Siguiente →</a>{% endif %}</div>
+  </div>
+</section>
+{% endblock %}
