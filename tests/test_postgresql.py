@@ -53,9 +53,7 @@ class PostgreSQLCompatibilityTests(unittest.TestCase):
 
         database.execute("SELECT * FROM quotes WHERE id=?", (7,))
 
-        cursor.execute.assert_called_once_with(
-            "SELECT * FROM quotes WHERE id=%s", (7,)
-        )
+        cursor.execute.assert_called_once_with("SELECT * FROM quotes WHERE id=%s", (7,))
 
     def test_compat_row_supports_mapping_and_numeric_access(self):
         row = CompatRow(("id", "name"), (7, "ITS"))

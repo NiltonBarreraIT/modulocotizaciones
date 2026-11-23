@@ -30,6 +30,20 @@ from .quotes import quote_fingerprint, validate_quote_data
 bp = Blueprint("admin", __name__)
 
 
+@bp.get("/admin")
+@admin_required
+def panel():
+    with connection() as database:
+        summary = {
+            "users": database.execute("SELECT count(*) FROM users").fetchone()[0],
+            "catalogs": database.execute(
+                "SELECT count(*) FROM catalog_entries WHERE active=1"
+            ).fetchone()[0],
+            "quotes": database.execute("SELECT count(*) FROM quotes").fetchone()[0],
+        }
+    return render_template("admin_panel.html", summary=summary)
+
+
 def _catalog_value():
     value = " ".join(request.form.get("value", "").split())
     if not value or len(value) > 120:

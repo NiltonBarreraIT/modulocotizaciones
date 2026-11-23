@@ -358,6 +358,95 @@ tbody tr:hover td {
   border-color: var(--its-border-strong);
 }
 
+.admin-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(0, 166, 212, 0.13), transparent 20rem),
+    var(--its-surface);
+}
+
+.admin-panel-heading h1 {
+  margin: 5px 0 8px;
+}
+
+.admin-panel-heading p {
+  max-width: 720px;
+  margin: 0;
+}
+
+.admin-eyebrow {
+  color: var(--its-blue-strong);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.admin-module-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr auto;
+  gap: 16px 18px;
+  min-height: 255px;
+  padding: 24px;
+  border: 1px solid var(--its-border);
+  border-radius: 12px;
+  background: var(--its-surface);
+  box-shadow: var(--its-shadow);
+}
+
+.admin-module-card:hover {
+  border-color: var(--its-border-strong);
+}
+
+.admin-module-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid #a9daeb;
+  border-radius: 12px;
+  background: var(--its-surface-active);
+  color: var(--its-navy);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.admin-module-copy h2 {
+  margin: 2px 0 8px;
+  font-size: 21px;
+}
+
+.admin-module-copy p {
+  min-height: 3em;
+  margin: 0 0 14px;
+  color: var(--its-muted);
+}
+
+.admin-module-meta {
+  display: inline-block;
+  color: var(--its-navy);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.admin-module-card > .btn {
+  grid-column: 1 / -1;
+  align-self: end;
+  justify-self: start;
+}
+
 @media (max-width: 700px) {
   header {
     padding: 14px 16px;
@@ -379,6 +468,24 @@ tbody tr:hover td {
 
   header form button.secondary {
     width: 100%;
+  }
+
+  .admin-panel-heading {
+    padding: 20px;
+  }
+
+  .admin-module-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-module-card {
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .admin-module-card > .btn {
+    width: 100%;
+    text-align: center;
   }
 }
 

@@ -106,6 +106,19 @@ class PhaseSevenTests(unittest.TestCase):
         form = admin.get(f"/quote/{quote_id}/edit").get_data(as_text=True)
         self.assertNotIn('<option value="Instrumentación">', form)
 
+    def test_admin_panel_groups_restricted_management_tools(self):
+        seller, _ = self.login("vendedor")
+        self.assertEqual(seller.get("/admin").status_code, 403)
+
+        admin, _ = self.login("admin")
+        response = admin.get("/admin")
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn("Panel de administración", page)
+        for module in ("Catálogos", "Usuarios", "Importar", "Exportar"):
+            self.assertIn(module, page)
+        self.assertIn('href="/admin"', page)
+
     def login(self, username, password="UserPassword123!"):
         if username == "admin":
             password = "AdminPassword123!"

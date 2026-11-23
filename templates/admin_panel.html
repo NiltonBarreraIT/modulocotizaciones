@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel admin-panel-heading">
+  <div>
+    <span class="admin-eyebrow">Acceso restringido</span>
+    <h1>Panel de administración</h1>
+    <p class="muted">Gestiona la configuración, los accesos y los datos de la plataforma desde un solo lugar.</p>
+  </div>
+  <span class="pill">Administrador</span>
+</section>
+
+<section class="admin-module-grid" aria-label="Módulos de administración">
+  <article class="admin-module-card">
+    <div class="admin-module-icon" aria-hidden="true">CA</div>
+    <div class="admin-module-copy">
+      <h2>Catálogos</h2>
+      <p>Administra áreas, fábricas y otras opciones reutilizables de las cotizaciones.</p>
+      <span class="admin-module-meta">{{summary.catalogs}} opciones activas</span>
+    </div>
+    <a class="btn" href="{{url_for('admin.catalogs')}}">Administrar catálogos</a>
+  </article>
+
+  <article class="admin-module-card">
+    <div class="admin-module-icon" aria-hidden="true">US</div>
+    <div class="admin-module-copy">
+      <h2>Usuarios</h2>
+      <p>Crea perfiles, asigna roles y gestiona las credenciales de acceso.</p>
+      <span class="admin-module-meta">{{summary.users}} usuarios registrados</span>
+    </div>
+    <a class="btn" href="{{url_for('admin.users')}}">Gestionar usuarios</a>
+  </article>
+
+  <article class="admin-module-card">
+    <div class="admin-module-icon" aria-hidden="true">IM</div>
+    <div class="admin-module-copy">
+      <h2>Importar</h2>
+      <p>Incorpora cotizaciones históricas desde un archivo Excel y revisa los datos antes de guardarlos.</p>
+      <span class="admin-module-meta">Archivos .xlsx</span>
+    </div>
+    <a class="btn" href="{{url_for('admin.import_excel')}}">Importar registros</a>
+  </article>
+
+  <article class="admin-module-card">
+    <div class="admin-module-icon" aria-hidden="true">EX</div>
+    <div class="admin-module-copy">
+      <h2>Exportar</h2>
+      <p>Descarga el registro completo de cotizaciones para análisis o respaldo.</p>
+      <span class="admin-module-meta">{{summary.quotes}} cotizaciones disponibles</span>
+    </div>
+    <a class="btn" href="{{url_for('quotes.export')}}">Exportar a Excel</a>
+  </article>
+</section>
+{% endblock %}
