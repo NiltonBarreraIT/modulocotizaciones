@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from flask import Blueprint, render_template, request
 
 from .auth import admin_required, current_user, login_required
-from .constants import REQUEST_STATUS_LABELS, STATUSES
+from .constants import STATUSES
 from .db import connection
 from .deadlines import ACTIVE_DUE_STATUSES, local_today, quote_timing
 
@@ -143,10 +143,6 @@ def dashboard():
         enriched_quote["commercial_year"] = _quote_year(enriched_quote)
         enriched.append(enriched_quote)
 
-    request_counts = Counter(
-        REQUEST_STATUS_LABELS.get(row["request_status"], row["request_status"])
-        for row in quotes
-    )
     available_years = sorted(
         {row["commercial_year"] for row in enriched if row["commercial_year"]},
         reverse=True,
@@ -169,6 +165,9 @@ def dashboard():
     )
     active_totals = defaultdict(Decimal)
     active_commercial_statuses = set(STATUSES) - {"Adjudicada", "Perdida", "Anulada"}
+    active_business_count = sum(
+        row["d"].get("estado") in active_commercial_statuses for row in commercial_rows
+    )
     for row in commercial_rows:
         if (
             row["display_currency"]
@@ -185,7 +184,6 @@ def dashboard():
         for row in enriched
     )
     overdue = [row for row in enriched if row["is_overdue"]]
-    delivered_count = sum(row["request_status"] == "entregada" for row in enriched)
     priority = sorted(
         (
             row
@@ -204,16 +202,6 @@ def dashboard():
             row["id"],
         ),
     )
-    total_quotes = len(enriched)
-    request_breakdown = [
-        {
-            "label": label,
-            "count": request_counts[label],
-            "percent": round(request_counts[label] * 100 / total_quotes),
-        }
-        for label in REQUEST_STATUS_LABELS.values()
-        if request_counts[label]
-    ]
     commercial_labels = [*STATUSES, "Sin estado"]
     commercial_total_quotes = len(commercial_rows)
     commercial_breakdown = [
@@ -231,8 +219,7 @@ def dashboard():
     win_rate = round(won_count * 100 / decided_count) if decided_count else None
     return render_template(
         "dashboard.html",
-        total_quotes=total_quotes,
-        request_breakdown=request_breakdown,
+        year_quote_count=commercial_total_quotes,
         commercial_breakdown=commercial_breakdown,
         active_totals={
             currency: active_totals[currency]
@@ -242,11 +229,12 @@ def dashboard():
         available_years=available_years or [selected_year],
         selected_year=selected_year,
         win_rate=win_rate,
+        won_count=won_count,
         decided_count=decided_count,
+        active_business_count=active_business_count,
         pending_count=pending_count,
         in_progress_count=in_progress_count,
         overdue_count=len(overdue),
-        delivered_count=delivered_count,
         priority=priority[:8],
         recent=enriched[:8],
     )

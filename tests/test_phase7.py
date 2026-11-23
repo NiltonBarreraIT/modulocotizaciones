@@ -186,6 +186,7 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn("Fecha límite vencida", dashboard)
         self.assertIn("Centro de gestión", dashboard)
         self.assertIn("Prioridades", dashboard)
+        self.assertIn("Operación interna", dashboard)
 
         overdue = admin.get("/?timing=atrasadas").get_data(as_text=True)
         self.assertIn("Pendiente atrasada", overdue)
@@ -241,7 +242,7 @@ class PhaseSevenTests(unittest.TestCase):
             data["estado"] = "Referencial"
             data["vendedor"] = "Mario Ahumada"
             database.execute(
-                "UPDATE quotes SET data=? WHERE id=?",
+                "UPDATE quotes SET data=?,request_status='registrada' WHERE id=?",
                 (json.dumps(data, ensure_ascii=False), quote_id),
             )
             older_quote = database.execute(
@@ -252,7 +253,7 @@ class PhaseSevenTests(unittest.TestCase):
             older_data["clp"] = "1000000"
             older_data["estado"] = "Abierta"
             database.execute(
-                "UPDATE quotes SET data=? WHERE id=?",
+                "UPDATE quotes SET data=?,request_status='registrada' WHERE id=?",
                 (json.dumps(older_data, ensure_ascii=False), older_quote_id),
             )
 
@@ -263,7 +264,15 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn("CLP 585.000.000", commercial_section)
         self.assertNotIn("CLP 1.000.000", commercial_section)
         self.assertNotIn("USD 650.000,00", dashboard)
-        self.assertIn("Resumen comercial · 2026", dashboard)
+        self.assertIn("Indicadores comerciales · 2026", dashboard)
+        self.assertIn("Cotizaciones del año", dashboard)
+        self.assertIn("Tasa de adjudicación", dashboard)
+        self.assertIn("Negocios abiertos", dashboard)
+        self.assertIn("Distribución comercial · 2026", dashboard)
+        self.assertIn("Cartera activa · 2026", dashboard)
+        self.assertNotIn("Pulso de solicitudes", dashboard)
+        self.assertNotIn("Operación interna", dashboard)
+        self.assertNotIn("Prioridades", dashboard)
         self.assertIn('name="year"', dashboard)
         self.assertIn('value="2026" selected', dashboard)
         self.assertIn("Los valores no se suman ni se convierten", dashboard)
@@ -278,7 +287,7 @@ class PhaseSevenTests(unittest.TestCase):
         older_commercial_section = older_dashboard.split(
             '<section class="panel home-commercial-panel">', 1
         )[1].split('<section class="panel home-recent-panel">', 1)[0]
-        self.assertIn("Resumen comercial · 2025", older_commercial_section)
+        self.assertIn("Cartera activa · 2025", older_commercial_section)
         self.assertIn("CLP 1.000.000", older_commercial_section)
         self.assertNotIn("CLP 585.000.000", older_commercial_section)
 
