@@ -12,7 +12,7 @@ from flask import (
     session,
     url_for,
 )
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import connection, iso, now
 
@@ -25,6 +25,7 @@ def current_user():
     with connection() as database:
         return database.execute(
             """SELECT users.id,users.username,users.email,users.phone,
+            users.must_change_password,
             COALESCE(NULLIF(trim(users.first_name || ' ' || users.last_name), ''),
                 users.username) AS display_name,
             CASE WHEN quote_estimators.user_id IS NOT NULL
@@ -59,6 +60,21 @@ def admin_required(function):
         return function(*args, **kwargs)
 
     return inner
+
+
+@bp.before_app_request
+def require_password_change():
+    """Keep users with a temporary password inside the change flow."""
+    if "user_id" not in session or request.endpoint in (
+        "auth.change_password",
+        "auth.logout",
+        "static",
+    ):
+        return None
+    user = current_user()
+    if user and user["must_change_password"]:
+        return redirect(url_for("auth.change_password"))
+    return None
 
 
 def _login_key(username):
@@ -140,6 +156,8 @@ def login():
             session.clear()
             session["user_id"] = user["id"]
             session["csrf"] = secrets.token_urlsafe(32)
+            if user["must_change_password"]:
+                return redirect(url_for("auth.change_password"))
             return redirect(url_for("quotes.index"))
 
         locked_until = _record_login_failure(key)
@@ -155,6 +173,48 @@ def login():
                 {"Retry-After": str(lock_minutes * 60)},
             )
     return render_template("login.html")
+
+
+@bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    user = current_user()
+    if not user["must_change_password"]:
+        return redirect(url_for("quotes.index"))
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        confirmation = request.form.get("password_confirmation", "")
+        error = None
+        if len(password) < 12:
+            error = "La nueva contraseña debe tener al menos 12 caracteres."
+        elif password != confirmation:
+            error = "Las contraseñas no coinciden."
+        else:
+            with connection() as database:
+                stored_user = database.execute(
+                    "SELECT password_hash FROM users WHERE id=?", (user["id"],)
+                ).fetchone()
+                if not stored_user:
+                    session.clear()
+                    return redirect(url_for("auth.login"))
+                if check_password_hash(stored_user["password_hash"], password):
+                    error = "La nueva contraseña debe ser distinta de la temporal."
+                else:
+                    database.execute(
+                        """UPDATE users SET password_hash=?,must_change_password=0
+                        WHERE id=?""",
+                        (generate_password_hash(password), user["id"]),
+                    )
+        if error:
+            flash(error)
+            return render_template("change_password.html"), 400
+
+        session["csrf"] = secrets.token_urlsafe(32)
+        flash("Contraseña actualizada. Ya puede usar la plataforma.")
+        return redirect(url_for("quotes.index"))
+
+    return render_template("change_password.html")
 
 
 @bp.route("/logout", methods=["POST"])

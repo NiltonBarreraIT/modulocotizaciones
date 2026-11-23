@@ -101,6 +101,7 @@ Las pruebas verifican CSRF y bloqueo de login, validaciones, cabeceras HTTP, neu
 
 ## Reglas de acceso
 
+- Los usuarios creados desde la administración reciben una contraseña temporal y deben reemplazarla por otra de al menos 12 caracteres en su primer ingreso. Un administrador puede restablecerla y volver a exigir ese cambio.
 - **Usuario:** solo visualiza sus cotizaciones y las puede editar antes de 24 h desde **su último guardado**. Cada guardado suyo reinicia la ventana de 24 h.
 - **Administrador:** puede ver y editar todas las cotizaciones en cualquier momento. Sus cambios **no reabren** el plazo de los usuarios.
 - La validación ocurre en el **servidor**, incluso justo antes de guardar. Cambiar la hora del navegador no evita el bloqueo. El tiempo se guarda en UTC.
@@ -137,4 +138,4 @@ El PDF incluye cliente, versión, vigencia, moneda, descripción, productos y se
 
 El sistema ya cubre creación, líneas comerciales, aprobación, versiones, adjuntos y PDF, pero todavía no envía correos ni se conecta con OneDrive, SharePoint, Power Automate, CRM o ERP. Para importar históricos con fórmulas, abrir/guardar primero el Excel original en Excel para garantizar que sus valores almacenados estén calculados.
 
-Mejoras necesarias antes de producción corporativa: autenticación con Microsoft Entra ID y MFA, política de password/reset, limitación de acceso distribuida para despliegues con múltiples servidores, auditoría central inmutable, control de revisiones concurrentes, inspección antivirus de archivos y eliminación de cuentas controlada. Los controles actuales constituyen un prototipo funcional, no un sistema de seguridad empresarial completo.
+Mejoras necesarias antes de producción corporativa: autenticación con Microsoft Entra ID y MFA, recuperación autoservicio y una política corporativa completa de contraseñas, limitación de acceso distribuida para despliegues con múltiples servidores, auditoría central inmutable, control de revisiones concurrentes, inspección antivirus de archivos y eliminación de cuentas controlada. Los controles actuales constituyen un prototipo funcional, no un sistema de seguridad empresarial completo.

@@ -84,6 +84,7 @@ class PhaseOneTests(unittest.TestCase):
                 "018_commercial_collaboration",
                 "019_user_profiles",
                 "020_master_catalogs",
+                "021_password_change_required",
             ],
         )
 
@@ -136,6 +137,7 @@ class PhaseOneTests(unittest.TestCase):
         self.assertEqual(profile["first_name"], "María")
         self.assertEqual(profile["last_name"], "González")
         self.assertEqual(profile["phone"], "+56 9 1234 5678")
+        self.assertEqual(profile["must_change_password"], 1)
 
         updated = admin.post(
             f"/users/{profile['id']}/profile",
@@ -156,8 +158,46 @@ class PhaseOneTests(unittest.TestCase):
         self.assertEqual(profile["first_name"], "María José")
         self.assertEqual(profile["phone"], "+56 9 8765 4321")
 
-        user, _ = self.login("maria.gonzalez@i-tsolutions.cl", "ProfilePassword123!")
+        user, user_token = self.login(
+            "maria.gonzalez@i-tsolutions.cl", "ProfilePassword123!"
+        )
+        forced = user.get("/")
+        self.assertEqual(forced.status_code, 302)
+        self.assertTrue(forced.headers["Location"].endswith("/change-password"))
+        unchanged = user.post(
+            "/change-password",
+            data={
+                "csrf": user_token,
+                "password": "ProfilePassword123!",
+                "password_confirmation": "ProfilePassword123!",
+            },
+        )
+        self.assertEqual(unchanged.status_code, 400)
+        changed = user.post(
+            "/change-password",
+            data={
+                "csrf": user_token,
+                "password": "PersonalPassword456!",
+                "password_confirmation": "PersonalPassword456!",
+            },
+        )
+        self.assertEqual(changed.status_code, 302)
         self.assertEqual(user.get("/").status_code, 200)
+
+        admin_reset = admin.post(
+            f"/users/{profile['id']}/password",
+            data={
+                "csrf": token,
+                "password": "TemporaryPassword789!",
+                "password_confirmation": "TemporaryPassword789!",
+            },
+        )
+        self.assertEqual(admin_reset.status_code, 302)
+        with self.app.app_context(), connection() as database:
+            reset_profile = database.execute(
+                "SELECT must_change_password FROM users WHERE id=?", (profile["id"],)
+            ).fetchone()
+        self.assertEqual(reset_profile["must_change_password"], 1)
 
     def test_edit_window_expires_for_owner_but_not_admin(self):
         owner, owner_csrf = self.login("user1", "UserPassword123!")

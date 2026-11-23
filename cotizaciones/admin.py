@@ -303,8 +303,9 @@ def users():
             with connection() as database:
                 cursor = database.execute(
                     """INSERT INTO users(
-                    username,password_hash,role,first_name,last_name,email,phone
-                    ) VALUES(?,?,?,?,?,?,?)""",
+                    username,password_hash,role,first_name,last_name,email,phone,
+                    must_change_password
+                    ) VALUES(?,?,?,?,?,?,?,?)""",
                     (
                         email,
                         generate_password_hash(password),
@@ -313,6 +314,7 @@ def users():
                         last_name,
                         email,
                         phone,
+                        1,
                     ),
                 )
                 if role == "cotizador":
@@ -326,13 +328,31 @@ def users():
     with connection() as database:
         rows = database.execute(
             """SELECT users.id,users.username,users.first_name,users.last_name,
-            users.email,users.phone,
+            users.email,users.phone,users.must_change_password,
             CASE WHEN quote_estimators.user_id IS NOT NULL
                 THEN 'cotizador' ELSE users.role END AS role
             FROM users LEFT JOIN quote_estimators
             ON quote_estimators.user_id=users.id ORDER BY users.id"""
         ).fetchall()
     return render_template("users.html", users=rows)
+
+
+@bp.route("/users/<int:user_id>/edit")
+@admin_required
+def edit_user(user_id):
+    with connection() as database:
+        user = database.execute(
+            """SELECT users.id,users.username,users.first_name,users.last_name,
+            users.email,users.phone,users.must_change_password,
+            CASE WHEN quote_estimators.user_id IS NOT NULL
+                THEN 'cotizador' ELSE users.role END AS role
+            FROM users LEFT JOIN quote_estimators
+            ON quote_estimators.user_id=users.id WHERE users.id=?""",
+            (user_id,),
+        ).fetchone()
+    if not user:
+        abort(404)
+    return render_template("user_edit.html", edited_user=user)
 
 
 @bp.route("/users/<int:user_id>/role", methods=["POST"])
@@ -364,6 +384,30 @@ def update_user_profile(user_id):
     except INTEGRITY_ERRORS:
         flash("Ya existe un usuario con ese correo")
     return redirect(url_for("admin.users"))
+
+
+@bp.route("/users/<int:user_id>/password", methods=["POST"])
+@admin_required
+def update_user_password(user_id):
+    password = request.form.get("password", "")
+    confirmation = request.form.get("password_confirmation", "")
+    if len(password) < 12:
+        abort(400, "La contraseña temporal debe tener al menos 12 caracteres")
+    if password != confirmation:
+        abort(400, "Las contraseñas no coinciden")
+    with connection() as database:
+        target = database.execute(
+            "SELECT id FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+        if not target:
+            abort(404)
+        database.execute(
+            """UPDATE users SET password_hash=?,must_change_password=1
+            WHERE id=?""",
+            (generate_password_hash(password), user_id),
+        )
+    flash("Contraseña temporal actualizada. El usuario deberá cambiarla al ingresar.")
+    return redirect(url_for("admin.edit_user", user_id=user_id))
 
 
 @bp.route("/catalogs", methods=["GET", "POST"])
