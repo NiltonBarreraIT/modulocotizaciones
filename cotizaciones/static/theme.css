@@ -368,6 +368,18 @@ tbody tr:hover td {
   border-color: var(--its-border-strong);
 }
 
+.import-error {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid #e6a8ae;
+  border-radius: 9px;
+  background: var(--its-danger-soft);
+  color: var(--its-danger);
+}
+
 .admin-panel-heading {
   display: flex;
   align-items: flex-start;

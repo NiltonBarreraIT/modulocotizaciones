@@ -3,7 +3,7 @@ import os
 import re
 import secrets
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zipfile import ZipFile
 
 from flask import (
@@ -28,6 +28,48 @@ from .numbering import bump_correlative, quote_number, shift_solution_conflicts
 from .quotes import quote_fingerprint, validate_quote_data
 
 bp = Blueprint("admin", __name__)
+
+IMPORT_FIELD_ALIASES = {
+    "solicitud": ("fecha solicitud", "solicitud"),
+    "vendedor": ("vendedor",),
+    "fecha": ("fecha cotizacion", "fecha de cotizacion"),
+    "deteccion": (
+        "deteccion oportunidad",
+        "deteccion de oportunidad",
+        "deteccion",
+    ),
+    "levantamiento": (
+        "realizo levantamiento en terreno convirtio oportunidad en requerimiento "
+        "formal obtuvo toda la informacion para cotizar",
+        "realizo levantamiento en terreno",
+        "levantamiento en terreno",
+        "levantamiento",
+    ),
+    "propuesta": ("elaboro propuesta tecnica", "propuesta tecnica", "propuesta"),
+    "fabrica": ("fabrica",),
+    "area": ("area",),
+    "rfq": ("rfq",),
+    "cliente": ("cliente final", "nombre cliente", "cliente"),
+    "descripcion": (
+        "descripcion del suministro",
+        "descripcion del requerimiento",
+        "descripcion y detalle",
+        "descripcion",
+        "detalle",
+    ),
+    "clp": ("monto clp", "clp"),
+    "usd": ("monto usd", "usd"),
+    "eur": ("monto eur", "eur"),
+    "margen": ("margen", "de utilidad", "utilidad", "porcentaje utilidad"),
+    "utilidad_usd": ("utilidad usd", "utilidad us"),
+    "estado": (
+        "estado comercial",
+        "estado cotizacion",
+        "estado de cotizacion",
+        "estado",
+    ),
+}
+IMPORT_NUMBER_ALIASES = ("n", "no", "numero", "n cotizacion", "numero cotizacion")
 
 
 @bp.get("/admin")
@@ -100,20 +142,81 @@ def normalize_import_status(value):
 def _legacy_correlative(value):
     if isinstance(value, bool):
         return None
+    text = str(value or "").strip()
+    platform_number = re.fullmatch(r"ITS-(?:COT|SOL|LEG)-(\d+)", text, re.I)
+    if platform_number:
+        return int(platform_number.group(1))
     try:
         number = int(value)
     except (TypeError, ValueError, OverflowError):
         return None
-    if number <= 0 or str(value).strip() not in (str(number), f"{number}.0"):
+    if number <= 0 or text not in (str(number), f"{number}.0"):
         return None
     return number
 
 
-def _has_business_data(row):
-    relevant_columns = (0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18)
+def _header_index(normalized_headers, aliases):
+    for alias in aliases:
+        try:
+            return normalized_headers.index(alias)
+        except ValueError:
+            continue
+    return None
+
+
+def _import_mapping(normalized_headers):
+    mapping = {
+        key: _header_index(normalized_headers, aliases)
+        for key, aliases in IMPORT_FIELD_ALIASES.items()
+    }
+    number_index = _header_index(normalized_headers, IMPORT_NUMBER_ALIASES)
+    missing = [
+        label
+        for key, label in (
+            ("cliente", "Cliente"),
+            ("descripcion", "Descripción"),
+            ("estado", "Estado"),
+        )
+        if mapping[key] is None
+    ]
+    if number_index is None:
+        missing.insert(0, "Número")
+    if missing:
+        abort(400, "Faltan encabezados obligatorios: " + ", ".join(missing))
+    return mapping, number_index
+
+
+def _has_business_data(row, mapping, number_index):
+    relevant_columns = {
+        number_index,
+        *(index for index in mapping.values() if index is not None),
+    }
     return any(
-        row[index] is not None and str(row[index]).strip() for index in relevant_columns
+        index < len(row) and row[index] is not None and str(row[index]).strip()
+        for index in relevant_columns
     )
+
+
+def _import_value(value, key):
+    if value is None:
+        return ""
+    if key in ("solicitud", "fecha"):
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        text = str(value).strip()
+        for parser in (
+            lambda candidate: date.fromisoformat(candidate),
+            lambda candidate: datetime.strptime(candidate, "%d-%m-%Y").date(),
+            lambda candidate: datetime.strptime(candidate, "%d/%m/%Y").date(),
+        ):
+            try:
+                return parser(text).isoformat()
+            except ValueError:
+                continue
+        return text
+    return str(value).strip()
 
 
 def _existing_fingerprints(database):
@@ -153,48 +256,26 @@ def _parse_upload(upload):
         sheet = workbook.active
         if "COTIZACIONES" in workbook.sheetnames:
             sheet = workbook["COTIZACIONES"]
+        max_columns = min(sheet.max_column or 19, 100)
         header = next(
-            sheet.iter_rows(min_row=1, max_row=1, max_col=19, values_only=True),
+            sheet.iter_rows(
+                min_row=1, max_row=1, max_col=max_columns, values_only=True
+            ),
             None,
         )
         normalized = [normalize_header(value) for value in (header or ())]
-        if len(normalized) < 19 or sum(bool(value) for value in normalized) < 10:
-            abort(
-                400,
-                "El Excel no contiene la estructura esperada de 19 columnas A–S",
+        mapping, number_index = _import_mapping(normalized)
+        row_max_column = (
+            max(
+                number_index,
+                *(index for index in mapping.values() if index is not None),
             )
-        if "cliente" not in normalized[11] or not any(
-            word in normalized[12] for word in ("descripcion", "detalle")
-        ):
-            abort(
-                400,
-                "Las columnas L y M deben corresponder a cliente y descripción",
-            )
-        if normalized[2] not in ("n", "no", "numero", "n cotizacion"):
-            abort(400, "La columna C debe corresponder al N° de cotización")
-
-        mapping = {
-            "solicitud": 0,
-            "vendedor": 4,
-            "fecha": 3,
-            "deteccion": 5,
-            "levantamiento": 6,
-            "propuesta": 7,
-            "fabrica": 8,
-            "area": 9,
-            "rfq": 10,
-            "cliente": 11,
-            "descripcion": 12,
-            "clp": 13,
-            "usd": 14,
-            "eur": 15,
-            "margen": 16,
-            "utilidad_usd": 17,
-            "estado": 18,
-        }
+            + 1
+        )
         rows = []
         for row_number, row in enumerate(
-            sheet.iter_rows(min_row=2, max_col=19, values_only=True), start=2
+            sheet.iter_rows(min_row=2, max_col=row_max_column, values_only=True),
+            start=2,
         ):
             if row_number - 1 > current_app.config["IMPORT_MAX_ROWS"]:
                 abort(
@@ -202,26 +283,18 @@ def _parse_upload(upload):
                     f"El archivo supera el máximo de "
                     f"{current_app.config['IMPORT_MAX_ROWS']} filas",
                 )
-            if not _has_business_data(row):
+            if not _has_business_data(row, mapping, number_index):
                 continue
-            legacy_number = _legacy_correlative(row[2])
+            legacy_number = _legacy_correlative(row[number_index])
             data = {
-                key: (
-                    ""
-                    if row[index] is None
-                    else (
-                        row[index].date().isoformat()
-                        if isinstance(row[index], datetime)
-                        else str(row[index]).strip()
-                    )
-                )
+                key: _import_value(row[index], key) if index is not None else ""
                 for key, index in mapping.items()
             }
             raw_status = data["estado"]
             normalized_status = normalize_import_status(raw_status)
             validation_error = None
             if legacy_number is None:
-                validation_error = "N° de cotización inválido en la columna C"
+                validation_error = "N° de cotización inválido"
             elif normalized_status is None:
                 validation_error = f"Estado de cotización no reconocido: {raw_status!r}"
             else:
@@ -509,8 +582,17 @@ def import_excel():
     if request.method == "POST":
         upload = request.files.get("file")
         if not upload:
-            abort(400, "Debe seleccionar un archivo")
-        parsed_rows = _parse_upload(upload)
+            return render_template(
+                "import.html", import_error="Debe seleccionar un archivo"
+            ), 400
+        try:
+            parsed_rows = _parse_upload(upload)
+        except HTTPException as error:
+            if error.code not in (400, 413):
+                raise
+            return render_template(
+                "import.html", import_error=error.description
+            ), error.code
         user = current_user()
         batch_id = secrets.token_urlsafe(24)
         cutoff = iso(now() - timedelta(hours=current_app.config["IMPORT_BATCH_HOURS"]))

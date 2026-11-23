@@ -231,6 +231,67 @@ class PhaseZeroTests(unittest.TestCase):
             content_type="multipart/form-data",
         )
         self.assertEqual(response.status_code, 400)
+        self.assertIn("No se pudo revisar el archivo", response.get_data(as_text=True))
+
+    def test_import_accepts_reordered_columns_and_platform_headers(self):
+        client = self.app.test_client()
+        token = self.login(client)
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Cotizaciones"
+        sheet.append(
+            [
+                "Descripción",
+                "Estado",
+                "Número",
+                "Cliente final",
+                "Fecha solicitud",
+                "Deteccion oportunidad",
+                "Realizo levantamiento en terreno, convirtio oportunidad en "
+                "requerimiento formal, obtuvo toda la informacion para cotizar",
+                "% de Utilidad",
+                "UTILIDAD US$",
+            ]
+        )
+        sheet.append(
+            [
+                "Servicio exportado por la plataforma",
+                "Referencial",
+                "ITS-LEG-001099",
+                "Cliente reordenado",
+                "23-11-2026",
+                "Oportunidad detectada",
+                "Visita realizada",
+                20,
+                1000,
+            ]
+        )
+        content = BytesIO()
+        workbook.save(content)
+        workbook.close()
+        content.seek(0)
+
+        response = client.post(
+            "/import",
+            data={"csrf": token, "file": (content, "cotizaciones_ITS.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        preview = client.get(response.headers["Location"]).get_data(as_text=True)
+        self.assertIn("Cliente reordenado", preview)
+        batch_id = response.headers["Location"].rsplit("/", 1)[-1]
+        confirmed = client.post(f"/import/confirm/{batch_id}", data={"csrf": token})
+        self.assertEqual(confirmed.status_code, 302)
+        with self.app.app_context(), connection() as database:
+            imported = json.loads(
+                database.execute("SELECT data FROM quotes").fetchone()["data"]
+            )
+        self.assertEqual(imported["solicitud"], "2026-11-23")
+        self.assertEqual(imported["deteccion"], "Oportunidad detectada")
+        self.assertEqual(imported["levantamiento"], "Visita realizada")
+        self.assertEqual(imported["margen"], "20")
+        self.assertEqual(imported["utilidad_usd"], "1000")
 
 
 if __name__ == "__main__":

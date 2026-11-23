@@ -2,7 +2,9 @@
 {% block content %}
 <section class="panel">
   <h1>Importar registro histórico</h1>
-  <p>Selecciona un Excel con columnas A–S. Antes de guardar se mostrará una previsualización y las cotizaciones duplicadas serán omitidas automáticamente. Las fórmulas se leen como valores calculados guardados por Excel.</p>
+  <p>Selecciona un archivo Excel. Las columnas pueden estar en cualquier orden; el sistema las reconocerá por sus encabezados.</p>
+  <p class="muted">Encabezados obligatorios: Número, Cliente, Descripción y Estado. También es compatible con el formato histórico A–S y con archivos exportados por esta plataforma.</p>
+  {% if import_error %}<div class="import-error" role="alert"><strong>No se pudo revisar el archivo</strong><span>{{import_error}}</span></div>{% endif %}
   <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf" value="{{csrf}}">
     <p><input type="file" name="file" accept=".xlsx" required></p>
