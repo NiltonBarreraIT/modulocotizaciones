@@ -1,4 +1,33 @@
 (() => {
+  document.querySelectorAll("table").forEach((table) => {
+    if (table.classList.contains("commercial-lines-table")) {
+      table.classList.add("mobile-scroll-table");
+      return;
+    }
+
+    const headers = [...table.querySelectorAll("thead th")].map((header) =>
+      header.textContent.trim()
+    );
+    if (!headers.length) return;
+
+    table.classList.add("mobile-card-table");
+    table.closest(".scroll")?.classList.add("mobile-card-table-wrap");
+
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      const cells = [...row.children].filter((cell) => cell.tagName === "TD");
+      const isEmptyRow = cells.length === 1 && Number(cells[0].colSpan) > 1;
+      if (isEmptyRow) {
+        row.classList.add("mobile-empty-row");
+        return;
+      }
+      cells.forEach((cell, index) => {
+        cell.dataset.label = headers[index] || "Detalle";
+      });
+    });
+  });
+})();
+
+(() => {
   const revisionUrl = document.body.dataset.platformRevisionUrl;
   let revision = Number.parseInt(document.body.dataset.platformRevision || "0", 10);
   if (!revisionUrl || !Number.isFinite(revision)) return;
