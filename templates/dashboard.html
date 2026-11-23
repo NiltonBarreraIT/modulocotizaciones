@@ -156,7 +156,7 @@
           <td>{{q.estimator_name or 'Sin asignar'}}</td>
           <td><span class="pill">{{request_status_labels.get(q.request_status,q.request_status)}}</span></td>
           <td>{% if q.is_overdue %}<span class="pill overdue">Atrasada</span>{% elif q.target_date %}{{q.target_date|local_date}}{% else %}<span class="muted">Sin fecha</span>{% endif %}</td>
-          <td class="money">{% if q.total %}{{q.currency}} {{format_amount(q.total,q.currency)}}{% else %}<span class="muted">Sin monto</span>{% endif %}</td>
+          <td class="money">{% if q.display_total is not none %}{{q.display_currency}} {{format_amount(q.display_total,q.display_currency)}}{% else %}<span class="muted">Sin monto</span>{% endif %}</td>
         </tr>
       {% else %}<tr><td colspan="6"><div class="home-empty-state compact"><strong>Sin actividad todavía</strong><p>Crea la primera solicitud para comenzar.</p></div></td></tr>{% endfor %}</tbody>
     </table>

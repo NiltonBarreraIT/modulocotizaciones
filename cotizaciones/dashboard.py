@@ -1,6 +1,6 @@
 import json
 from collections import Counter, defaultdict
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, render_template
 
@@ -10,6 +10,25 @@ from .db import connection
 from .deadlines import ACTIVE_DUE_STATUSES, local_today, quote_timing
 
 bp = Blueprint("dashboard", __name__)
+
+
+def _positive_decimal(value):
+    try:
+        amount = Decimal(str(value or "0"))
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() and amount > 0 else None
+
+
+def _display_amount(quote):
+    commercial_total = _positive_decimal(quote.get("total"))
+    if commercial_total is not None and quote.get("currency"):
+        return quote["currency"], commercial_total
+    for currency, key in (("CLP", "clp"), ("USD", "usd"), ("EUR", "eur")):
+        historical_total = _positive_decimal(quote["d"].get(key))
+        if historical_total is not None:
+            return currency, historical_total
+    return "", None
 
 
 @bp.route("/approvals")
@@ -105,6 +124,9 @@ def dashboard():
             and days_to_due is not None
             and 0 <= days_to_due <= 7
         )
+        display_currency, display_total = _display_amount(enriched_quote)
+        enriched_quote["display_currency"] = display_currency
+        enriched_quote["display_total"] = display_total
         enriched.append(enriched_quote)
 
     request_counts = Counter(
@@ -118,11 +140,11 @@ def dashboard():
     active_commercial_statuses = set(STATUSES) - {"Adjudicada", "Perdida", "Anulada"}
     for row in enriched:
         if (
-            row["currency"]
-            and row["total"]
+            row["display_currency"]
+            and row["display_total"] is not None
             and row["d"].get("estado") in active_commercial_statuses
         ):
-            active_totals[row["currency"]] += Decimal(row["total"])
+            active_totals[row["display_currency"]] += row["display_total"]
     pending_count = sum(
         row["request_status"] == "pendiente_asignacion" for row in enriched
     )

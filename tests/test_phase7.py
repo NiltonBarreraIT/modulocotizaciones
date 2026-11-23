@@ -223,6 +223,28 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn(">Inicio</a>", page)
         self.assertNotIn(">Tablero</a>", page)
 
+    def test_dashboard_uses_historical_clp_when_commercial_total_is_missing(self):
+        seller, csrf = self.login("vendedor")
+        quote_id = self.create_request(
+            seller, csrf, "Cliente con monto histórico", "2026-11-23"
+        )
+        with self.app.app_context(), connection() as database:
+            quote = database.execute(
+                "SELECT data FROM quotes WHERE id=?", (quote_id,)
+            ).fetchone()
+            data = json.loads(quote["data"])
+            data["clp"] = "585000000"
+            data["usd"] = "650000"
+            data["estado"] = "Referencial"
+            database.execute(
+                "UPDATE quotes SET data=? WHERE id=?",
+                (json.dumps(data, ensure_ascii=False), quote_id),
+            )
+
+        dashboard = seller.get("/dashboard").get_data(as_text=True)
+        self.assertIn("CLP 585.000.000", dashboard)
+        self.assertNotIn("USD 650.000,00", dashboard)
+
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")
         invalid = seller.post(
