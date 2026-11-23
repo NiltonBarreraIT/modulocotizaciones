@@ -291,6 +291,65 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn("CLP 1.000.000", older_commercial_section)
         self.assertNotIn("CLP 585.000.000", older_commercial_section)
 
+    def test_dashboard_ranks_adjudicated_sellers_for_selected_year(self):
+        seller, csrf = self.login("vendedor")
+        ranked_quotes = [
+            (
+                self.create_request(seller, csrf, "Adjudicada Ana 1", "2026-03-01"),
+                "Ana Comercial",
+                "2026-03-01",
+            ),
+            (
+                self.create_request(seller, csrf, "Adjudicada Ana 2", "2026-04-01"),
+                "ana comercial",
+                "2026-04-01",
+            ),
+            (
+                self.create_request(seller, csrf, "Adjudicada Mario", "2026-05-01"),
+                "Mario Ahumada",
+                "2026-05-01",
+            ),
+            (
+                self.create_request(seller, csrf, "Adjudicada 2025", "2025-05-01"),
+                "Hector Martinez",
+                "2025-05-01",
+            ),
+        ]
+        with self.app.app_context(), connection() as database:
+            for quote_id, seller_name, quote_date in ranked_quotes:
+                quote = database.execute(
+                    "SELECT data FROM quotes WHERE id=?", (quote_id,)
+                ).fetchone()
+                data = json.loads(quote["data"])
+                data["fecha"] = quote_date
+                data["estado"] = "Adjudicada"
+                data["vendedor"] = seller_name
+                database.execute(
+                    "UPDATE quotes SET data=?,request_status='registrada' WHERE id=?",
+                    (json.dumps(data, ensure_ascii=False), quote_id),
+                )
+
+        dashboard = seller.get("/dashboard?year=2026").get_data(as_text=True)
+        seller_panel = dashboard.split(
+            '<section class="panel dashboard-seller-panel">', 1
+        )[1].split("</section>", 1)[0]
+        self.assertIn("Top vendedores · 2026", seller_panel)
+        self.assertIn('data-seller="Ana Comercial"', seller_panel)
+        self.assertIn('class="dashboard-seller-count">2</strong>', seller_panel)
+        self.assertIn('data-seller="Mario Ahumada"', seller_panel)
+        self.assertNotIn("Hector Martinez", seller_panel)
+        self.assertLess(
+            seller_panel.index("Ana Comercial"), seller_panel.index("Mario Ahumada")
+        )
+
+        older_dashboard = seller.get("/dashboard?year=2025").get_data(as_text=True)
+        older_seller_panel = older_dashboard.split(
+            '<section class="panel dashboard-seller-panel">', 1
+        )[1].split("</section>", 1)[0]
+        self.assertIn("Top vendedores · 2025", older_seller_panel)
+        self.assertIn('data-seller="Hector Martinez"', older_seller_panel)
+        self.assertNotIn("Ana Comercial", older_seller_panel)
+
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")
         invalid = seller.post(

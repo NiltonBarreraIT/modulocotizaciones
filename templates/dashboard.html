@@ -1,5 +1,21 @@
 {% extends 'base.html' %}
 {% block content %}
+<style>
+  .dashboard-commercial-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(340px,.75fr);gap:18px;margin-bottom:18px}
+  .dashboard-commercial-grid>.panel{margin:0}
+  .dashboard-commercial-grid .home-breakdown{gap:12px}
+  .dashboard-seller-list{display:grid;gap:10px}
+  .dashboard-seller-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--its-border)}
+  .dashboard-seller-row:last-child{border-bottom:0}
+  .dashboard-seller-rank{display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:var(--its-surface-active);color:var(--its-navy);font-size:14px;font-weight:800}
+  .dashboard-seller-main{min-width:0}
+  .dashboard-seller-main strong{display:block;overflow:hidden;color:var(--its-ink);font-size:15px;text-overflow:ellipsis;white-space:nowrap}
+  .dashboard-seller-bar{height:6px;margin-top:7px;overflow:hidden;border-radius:10px;background:#e4f0f5}
+  .dashboard-seller-bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--its-blue),var(--its-cyan-bright))}
+  .dashboard-seller-count{min-width:34px;color:var(--its-ink);font-size:20px;text-align:right}
+  .dashboard-seller-caption{display:block;margin-top:2px;color:var(--its-muted);font-size:12px;font-weight:500}
+  @media(max-width:1000px){.dashboard-commercial-grid{grid-template-columns:1fr}}
+</style>
 <section class="home-hero">
   <div class="home-hero-copy">
     <span class="home-eyebrow">Vista general</span>
@@ -86,8 +102,7 @@
 </section>
 {% endif %}
 
-<div class="home-layout" {% if not priority %}style="grid-template-columns:1fr"{% endif %}>
-  {% if priority %}
+{% if priority %}
   <section class="panel home-priority-panel">
     <div class="home-section-heading">
       <div>
@@ -116,8 +131,9 @@
       {% endfor %}
     </div>
   </section>
-  {% endif %}
+{% endif %}
 
+<div class="dashboard-commercial-grid">
   <section class="panel home-pulse-panel">
     <div class="home-section-heading">
       <div>
@@ -137,6 +153,33 @@
     </div>
     {% else %}
     <div class="home-empty-state compact"><p>No hay estados comerciales registrados para {{selected_year}}.</p></div>
+    {% endif %}
+  </section>
+
+  <section class="panel dashboard-seller-panel">
+    <div class="home-section-heading">
+      <div>
+        <span class="home-section-kicker">Desempeño</span>
+        <h2>Top vendedores · {{selected_year}}</h2>
+        <p>Cotizaciones adjudicadas por vendedor.</p>
+      </div>
+    </div>
+    {% if top_sellers %}
+    <div class="dashboard-seller-list" aria-label="Ranking de vendedores con cotizaciones adjudicadas">
+      {% for seller in top_sellers %}
+      <div class="dashboard-seller-row" data-seller="{{seller.name}}">
+        <span class="dashboard-seller-rank">{{loop.index}}</span>
+        <div class="dashboard-seller-main">
+          <strong>{{seller.name}}</strong>
+          <span class="dashboard-seller-caption">{{'Cotización adjudicada' if seller.count == 1 else 'Cotizaciones adjudicadas'}}</span>
+          <div class="dashboard-seller-bar" role="progressbar" aria-label="{{seller.name}}" aria-valuenow="{{seller.percent}}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{seller.percent}}%"></span></div>
+        </div>
+        <strong class="dashboard-seller-count">{{seller.count}}</strong>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="home-empty-state compact"><p>No hay cotizaciones adjudicadas para {{selected_year}}.</p></div>
     {% endif %}
   </section>
 </div>

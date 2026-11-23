@@ -217,6 +217,36 @@ def dashboard():
     lost_count = status_counts["Perdida"]
     decided_count = won_count + lost_count
     win_rate = round(won_count * 100 / decided_count) if decided_count else None
+    seller_wins = Counter()
+    seller_labels = {}
+    for row in commercial_rows:
+        if row["d"].get("estado") != "Adjudicada":
+            continue
+        seller = " ".join(
+            str(row["d"].get("vendedor") or row.get("seller_name") or "").split()
+        )
+        if not seller:
+            continue
+        seller_key = seller.casefold()
+        seller_wins[seller_key] += 1
+        current_label = seller_labels.get(seller_key, "")
+        if sum(character.isupper() for character in seller) > sum(
+            character.isupper() for character in current_label
+        ):
+            seller_labels[seller_key] = seller
+    ranked_sellers = sorted(
+        seller_wins.items(),
+        key=lambda item: (-item[1], seller_labels[item[0]].casefold()),
+    )[:5]
+    top_seller_count = ranked_sellers[0][1] if ranked_sellers else 0
+    top_sellers = [
+        {
+            "name": seller_labels[key],
+            "count": count,
+            "percent": round(count * 100 / top_seller_count),
+        }
+        for key, count in ranked_sellers
+    ]
     return render_template(
         "dashboard.html",
         year_quote_count=commercial_total_quotes,
@@ -232,6 +262,7 @@ def dashboard():
         won_count=won_count,
         decided_count=decided_count,
         active_business_count=active_business_count,
+        top_sellers=top_sellers,
         pending_count=pending_count,
         in_progress_count=in_progress_count,
         overdue_count=len(overdue),
