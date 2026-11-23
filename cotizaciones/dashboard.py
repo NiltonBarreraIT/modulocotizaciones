@@ -1,8 +1,9 @@
 import json
+import re
 from collections import Counter, defaultdict
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 
 from .auth import admin_required, current_user, login_required
 from .constants import REQUEST_STATUS_LABELS, STATUSES
@@ -29,6 +30,18 @@ def _display_amount(quote):
         if historical_total is not None:
             return currency, historical_total
     return "", None
+
+
+def _quote_year(quote):
+    for value in (
+        quote["d"].get("fecha"),
+        quote["d"].get("solicitud"),
+        quote.get("created_at"),
+    ):
+        match = re.search(r"(?:^|\D)((?:19|20)\d{2})(?:\D|$)", str(value or ""))
+        if match:
+            return int(match.group(1))
+    return None
 
 
 @bp.route("/approvals")
@@ -127,18 +140,36 @@ def dashboard():
         display_currency, display_total = _display_amount(enriched_quote)
         enriched_quote["display_currency"] = display_currency
         enriched_quote["display_total"] = display_total
+        enriched_quote["commercial_year"] = _quote_year(enriched_quote)
         enriched.append(enriched_quote)
 
     request_counts = Counter(
         REQUEST_STATUS_LABELS.get(row["request_status"], row["request_status"])
         for row in quotes
     )
+    available_years = sorted(
+        {row["commercial_year"] for row in enriched if row["commercial_year"]},
+        reverse=True,
+    )
+    requested_year = request.args.get("year", type=int)
+    selected_year = (
+        requested_year
+        if requested_year in available_years
+        else today.year
+        if today.year in available_years
+        else available_years[0]
+        if available_years
+        else today.year
+    )
+    commercial_rows = [
+        row for row in enriched if row["commercial_year"] == selected_year
+    ]
     status_counts = Counter(
-        json.loads(row["data"]).get("estado") or "Sin estado" for row in quotes
+        row["d"].get("estado") or "Sin estado" for row in commercial_rows
     )
     active_totals = defaultdict(Decimal)
     active_commercial_statuses = set(STATUSES) - {"Adjudicada", "Perdida", "Anulada"}
-    for row in enriched:
+    for row in commercial_rows:
         if (
             row["display_currency"]
             and row["display_total"] is not None
@@ -184,11 +215,12 @@ def dashboard():
         if request_counts[label]
     ]
     commercial_labels = [*STATUSES, "Sin estado"]
+    commercial_total_quotes = len(commercial_rows)
     commercial_breakdown = [
         {
             "label": label,
             "count": status_counts[label],
-            "percent": round(status_counts[label] * 100 / total_quotes),
+            "percent": round(status_counts[label] * 100 / commercial_total_quotes),
         }
         for label in commercial_labels
         if status_counts[label]
@@ -202,7 +234,13 @@ def dashboard():
         total_quotes=total_quotes,
         request_breakdown=request_breakdown,
         commercial_breakdown=commercial_breakdown,
-        active_totals=dict(active_totals),
+        active_totals={
+            currency: active_totals[currency]
+            for currency in ("CLP", "USD", "EUR")
+            if active_totals[currency]
+        },
+        available_years=available_years or [selected_year],
+        selected_year=selected_year,
         win_rate=win_rate,
         decided_count=decided_count,
         pending_count=pending_count,

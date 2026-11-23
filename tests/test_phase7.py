@@ -228,6 +228,9 @@ class PhaseSevenTests(unittest.TestCase):
         quote_id = self.create_request(
             seller, csrf, "Cliente con monto histórico", "2026-11-23"
         )
+        older_quote_id = self.create_request(
+            seller, csrf, "Cliente del año anterior", "2025-06-10"
+        )
         with self.app.app_context(), connection() as database:
             quote = database.execute(
                 "SELECT data FROM quotes WHERE id=?", (quote_id,)
@@ -241,16 +244,43 @@ class PhaseSevenTests(unittest.TestCase):
                 "UPDATE quotes SET data=? WHERE id=?",
                 (json.dumps(data, ensure_ascii=False), quote_id),
             )
+            older_quote = database.execute(
+                "SELECT data FROM quotes WHERE id=?", (older_quote_id,)
+            ).fetchone()
+            older_data = json.loads(older_quote["data"])
+            older_data["fecha"] = "2025-06-10"
+            older_data["clp"] = "1000000"
+            older_data["estado"] = "Abierta"
+            database.execute(
+                "UPDATE quotes SET data=? WHERE id=?",
+                (json.dumps(older_data, ensure_ascii=False), older_quote_id),
+            )
 
         dashboard = seller.get("/dashboard").get_data(as_text=True)
-        self.assertIn("CLP 585.000.000", dashboard)
+        commercial_section = dashboard.split(
+            '<section class="panel home-commercial-panel">', 1
+        )[1].split('<section class="panel home-recent-panel">', 1)[0]
+        self.assertIn("CLP 585.000.000", commercial_section)
+        self.assertNotIn("CLP 1.000.000", commercial_section)
         self.assertNotIn("USD 650.000,00", dashboard)
+        self.assertIn("Resumen comercial · 2026", dashboard)
+        self.assertIn('name="year"', dashboard)
+        self.assertIn('value="2026" selected', dashboard)
+        self.assertIn("Los valores no se suman ni se convierten", dashboard)
         self.assertIn("<th>Vendedor</th>", dashboard)
         self.assertIn("Mario Ahumada", dashboard)
         self.assertIn("<th>Etapa</th>", dashboard)
         self.assertIn("<th>Estado comercial</th>", dashboard)
         self.assertIn("Referencial", dashboard)
         self.assertNotIn("<th>Responsable</th>", dashboard)
+
+        older_dashboard = seller.get("/dashboard?year=2025").get_data(as_text=True)
+        older_commercial_section = older_dashboard.split(
+            '<section class="panel home-commercial-panel">', 1
+        )[1].split('<section class="panel home-recent-panel">', 1)[0]
+        self.assertIn("Resumen comercial · 2025", older_commercial_section)
+        self.assertIn("CLP 1.000.000", older_commercial_section)
+        self.assertNotIn("CLP 585.000.000", older_commercial_section)
 
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")

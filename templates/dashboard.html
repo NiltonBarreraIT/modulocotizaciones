@@ -109,21 +109,29 @@
   </section>
 </div>
 
-{% if active_totals or commercial_breakdown %}
 <section class="panel home-commercial-panel">
   <div class="home-section-heading">
     <div>
       <span class="home-section-kicker">Comercial</span>
-      <h2>Negocios en curso</h2>
-      <p>Valores y estados abiertos; no incluye negocios adjudicados, perdidos o anulados.</p>
+      <h2>Resumen comercial · {{selected_year}}</h2>
+      <p>Montos activos por moneda y negocios por estado. Los valores no se suman ni se convierten.</p>
     </div>
+    <form method="get" style="display:flex;align-items:flex-end;gap:8px;margin:0">
+      <div style="min-width:145px">
+        <label for="dashboard-year">Año de cotización</label>
+        <select id="dashboard-year" name="year">
+          {% for year in available_years %}<option value="{{year}}" {{'selected' if year==selected_year else ''}}>{{year}}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="secondary" type="submit">Ver año</button>
+    </form>
   </div>
   <div class="home-commercial-layout">
     <div class="home-value-grid">
       {% for currency,total in active_totals.items() %}
-      <div class="home-value-card"><span>Valor activo {{currency}}</span><strong>{{format_amount(total,currency)}}</strong></div>
+      <div class="home-value-card"><span>Cartera activa en {{currency}}</span><strong>{{currency}} {{format_amount(total,currency)}}</strong><small style="display:block;margin-top:8px;color:var(--its-muted)">Sin conversión a otra moneda</small></div>
       {% else %}
-      <div class="home-empty-state compact"><p>Las cotizaciones en curso todavía no tienen montos registrados.</p></div>
+      <div class="home-empty-state compact"><p>No hay montos activos registrados para {{selected_year}}.</p></div>
       {% endfor %}
     </div>
     {% if commercial_breakdown %}
@@ -132,10 +140,11 @@
       <div><span>{{item.label}}</span><strong>{{item.count}}</strong></div>
       {% endfor %}
     </div>
+    {% else %}
+    <div class="home-empty-state compact"><p>No hay estados comerciales registrados para {{selected_year}}.</p></div>
     {% endif %}
   </div>
 </section>
-{% endif %}
 
 <section class="panel home-recent-panel">
   <div class="home-section-heading">
