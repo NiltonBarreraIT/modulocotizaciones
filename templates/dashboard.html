@@ -141,24 +141,25 @@
   <div class="home-section-heading">
     <div>
       <span class="home-section-kicker">Seguimiento</span>
-      <h2>Actividad reciente</h2>
+      <h2>Solicitudes recientes</h2>
       <p>Las últimas solicitudes visibles para tu perfil.</p>
     </div>
     <a href="{{url_for('quotes.index')}}">Abrir listado completo</a>
   </div>
   <div class="scroll">
     <table class="home-recent-table">
-      <thead><tr><th>Solicitud</th><th>Cliente</th><th>Responsable</th><th>Estado</th><th>Plazo</th><th>Total</th></tr></thead>
+      <thead><tr><th>Solicitud</th><th>Cliente</th><th>Vendedor</th><th>Etapa</th><th>Estado comercial</th><th>Plazo</th><th>Total</th></tr></thead>
       <tbody>{% for q in recent %}
         <tr>
           <td><a href="{{url_for('quotes.detail',quote_id=q.id)}}"><strong>{{q.number}}</strong></a><small>{{q.age_label}}</small></td>
           <td>{{q.d.cliente or 'Sin cliente'}}</td>
-          <td>{{q.estimator_name or 'Sin asignar'}}</td>
+          <td>{{q.d.vendedor or q.seller_name or 'Sin vendedor'}}</td>
           <td><span class="pill">{{request_status_labels.get(q.request_status,q.request_status)}}</span></td>
+          <td>{{q.d.estado or 'Sin estado'}}</td>
           <td>{% if q.is_overdue %}<span class="pill overdue">Atrasada</span>{% elif q.target_date %}{{q.target_date|local_date}}{% else %}<span class="muted">Sin fecha</span>{% endif %}</td>
           <td class="money">{% if q.display_total is not none %}{{q.display_currency}} {{format_amount(q.display_total,q.display_currency)}}{% else %}<span class="muted">Sin monto</span>{% endif %}</td>
         </tr>
-      {% else %}<tr><td colspan="6"><div class="home-empty-state compact"><strong>Sin actividad todavía</strong><p>Crea la primera solicitud para comenzar.</p></div></td></tr>{% endfor %}</tbody>
+      {% else %}<tr><td colspan="7"><div class="home-empty-state compact"><strong>Sin solicitudes todavía</strong><p>Crea la primera solicitud para comenzar.</p></div></td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </section>

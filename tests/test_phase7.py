@@ -236,6 +236,7 @@ class PhaseSevenTests(unittest.TestCase):
             data["clp"] = "585000000"
             data["usd"] = "650000"
             data["estado"] = "Referencial"
+            data["vendedor"] = "Mario Ahumada"
             database.execute(
                 "UPDATE quotes SET data=? WHERE id=?",
                 (json.dumps(data, ensure_ascii=False), quote_id),
@@ -244,6 +245,12 @@ class PhaseSevenTests(unittest.TestCase):
         dashboard = seller.get("/dashboard").get_data(as_text=True)
         self.assertIn("CLP 585.000.000", dashboard)
         self.assertNotIn("USD 650.000,00", dashboard)
+        self.assertIn("<th>Vendedor</th>", dashboard)
+        self.assertIn("Mario Ahumada", dashboard)
+        self.assertIn("<th>Etapa</th>", dashboard)
+        self.assertIn("<th>Estado comercial</th>", dashboard)
+        self.assertIn("Referencial", dashboard)
+        self.assertNotIn("<th>Responsable</th>", dashboard)
 
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")
