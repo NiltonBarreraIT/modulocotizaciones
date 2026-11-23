@@ -164,7 +164,11 @@ class Database:
         if self.engine == "sqlite":
             return CompatCursor(self.raw_connection.execute(sql, parameters))
         cursor = self.raw_connection.cursor()
-        cursor.execute(self._postgres_statement(sql), parameters)
+        statement = self._postgres_statement(sql)
+        if parameters:
+            cursor.execute(statement, parameters)
+        else:
+            cursor.execute(statement)
         return CompatCursor(cursor, postgres=True)
 
     def executemany(self, sql, parameters):
