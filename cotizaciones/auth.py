@@ -158,7 +158,7 @@ def login():
             session["csrf"] = secrets.token_urlsafe(32)
             if user["must_change_password"]:
                 return redirect(url_for("auth.change_password"))
-            return redirect(url_for("quotes.index"))
+            return redirect(url_for("dashboard.dashboard"))
 
         locked_until = _record_login_failure(key)
         flash(
@@ -180,7 +180,7 @@ def login():
 def change_password():
     user = current_user()
     if not user["must_change_password"]:
-        return redirect(url_for("quotes.index"))
+        return redirect(url_for("dashboard.dashboard"))
 
     if request.method == "POST":
         password = request.form.get("password", "")
@@ -212,7 +212,7 @@ def change_password():
 
         session["csrf"] = secrets.token_urlsafe(32)
         flash("Contraseña actualizada. Ya puede usar la plataforma.")
-        return redirect(url_for("quotes.index"))
+        return redirect(url_for("dashboard.dashboard"))
 
     return render_template("change_password.html")
 

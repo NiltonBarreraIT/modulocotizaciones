@@ -1,28 +1,165 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>Tablero comercial</h1>
-<div class="cards">
-  {% if me.role=='admin' %}<a class="card overdue-card" href="{{url_for('dashboard.approvals')}}"><span class="muted">Por aprobar</span><strong>{{pending_approval_count}}</strong></a>{% endif %}
-  <a class="card" href="{{url_for('quotes.index',request_status='pendiente_asignacion')}}"><span class="muted">Sin tomar</span><strong>{{pending_count}}</strong></a>
-  <div class="card"><span class="muted">En gestión</span><strong>{{in_progress_count}}</strong></div>
-  <a class="card overdue-card" href="{{url_for('quotes.index',timing='atrasadas')}}"><span class="muted">Atrasadas</span><strong>{{overdue_count}}</strong></a>
-  <a class="card" href="{{url_for('quotes.index',request_status='entregada')}}"><span class="muted">Entregadas</span><strong>{{delivered_count}}</strong></a>
-</div>
-{% if currency_totals %}<div class="cards"><div class="card"><span class="muted">Solicitudes visibles</span><strong>{{total_quotes}}</strong></div>{% for currency,total in currency_totals.items() %}<div class="card"><span class="muted">Total {{currency}}</span><strong>{{format_amount(total,currency)}}</strong></div>{% endfor %}</div>{% endif %}
+<section class="home-hero">
+  <div class="home-hero-copy">
+    <span class="home-eyebrow">Vista general</span>
+    <h1>Centro de gestión</h1>
+    <p>Hola, {{me.display_name}}. {% if me.role=='admin' %}Aquí tienes el estado operativo y comercial de toda la plataforma.{% elif me.role=='cotizador' %}Aquí tienes tus asignaciones, plazos y solicitudes disponibles.{% else %}Aquí puedes seguir el avance de tus solicitudes y detectar lo que requiere atención.{% endif %}</p>
+  </div>
+  <div class="home-actions" aria-label="Acciones rápidas">
+    <a class="btn" href="{{url_for('quotes.create')}}">Nueva solicitud</a>
+    <a class="btn secondary" href="{{url_for('quotes.index')}}">Ver solicitudes</a>
+  </div>
+</section>
 
-{% if overdue %}
-<section class="panel">
-  <div class="toolbar"><div><h2>Requieren atención</h2><p class="muted">Solicitudes sin tomar fuera del objetivo o con fecha límite vencida.</p></div><a class="btn secondary" href="{{url_for('quotes.index',timing='atrasadas')}}">Ver todas</a></div>
-  <div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Cotizador</th><th>Estado</th><th>Antigüedad</th><th>Motivo</th></tr></thead><tbody>
-  {% for q in overdue %}<tr><td><a href="{{url_for('quotes.detail',quote_id=q.id)}}"><b>{{q.number}}</b></a></td><td>{{q.d.cliente}}</td><td>{{q.estimator_name or 'Sin asignar'}}</td><td>{{request_status_labels.get(q.request_status,q.request_status)}}</td><td>{{q.age_label}}</td><td><span class="pill overdue">{{q.overdue_reason}}</span></td></tr>{% endfor %}
-  </tbody></table></div>
+{% if me.role=='admin' and pending_approval_count %}
+<section class="home-alert">
+  <div>
+    <span class="home-alert-label">Revisión pendiente</span>
+    <strong>{{pending_approval_count}} {{'cotización espera' if pending_approval_count == 1 else 'cotizaciones esperan'}} aprobación</strong>
+    <p>Revísalas para que el equipo pueda continuar con el envío.</p>
+  </div>
+  <a class="btn" href="{{url_for('dashboard.approvals')}}">Revisar aprobaciones</a>
 </section>
 {% endif %}
 
-<div class="compare">
-  <section class="panel"><h2>Solicitudes</h2><table><thead><tr><th>Etapa</th><th>Cantidad</th></tr></thead><tbody>{% for status,count in request_counts.items() %}<tr><td class="workflow">{{status}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Sin datos</td></tr>{% endfor %}</tbody></table></section>
-  <section class="panel"><h2>Estado comercial</h2><table><thead><tr><th>Estado</th><th>Cantidad</th></tr></thead><tbody>{% for status,count in status_counts.items() %}<tr><td>{{status}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Sin datos</td></tr>{% endfor %}</tbody></table></section>
+<section class="home-metrics" aria-label="Indicadores principales">
+  <a class="home-metric" href="{{url_for('quotes.index',request_status='pendiente_asignacion')}}">
+    <span class="home-metric-label">Por asignar</span>
+    <strong>{{pending_count}}</strong>
+    <small>Requieren un cotizador</small>
+  </a>
+  <a class="home-metric" href="{{url_for('quotes.index')}}">
+    <span class="home-metric-label">En trabajo</span>
+    <strong>{{in_progress_count}}</strong>
+    <small>Cotización, información o corrección</small>
+  </a>
+  <a class="home-metric home-metric-critical" href="{{url_for('quotes.index',timing='atrasadas')}}">
+    <span class="home-metric-label">Fuera de plazo</span>
+    <strong>{{overdue_count}}</strong>
+    <small>Necesitan atención inmediata</small>
+  </a>
+  <a class="home-metric" href="{{url_for('quotes.index',request_status='entregada')}}">
+    <span class="home-metric-label">Entregadas</span>
+    <strong>{{delivered_count}}</strong>
+    <small>Dentro de tu vista actual</small>
+  </a>
+</section>
+
+<div class="home-layout">
+  <section class="panel home-priority-panel">
+    <div class="home-section-heading">
+      <div>
+        <span class="home-section-kicker">Acción</span>
+        <h2>Prioridades</h2>
+        <p>Ordenadas por urgencia para que sepas dónde comenzar.</p>
+      </div>
+      {% if priority %}<a href="{{url_for('quotes.index')}}">Ver todas</a>{% endif %}
+    </div>
+    {% if priority %}
+    <div class="home-priority-list">
+      {% for q in priority %}
+      <a class="home-priority-item" href="{{url_for('quotes.detail',quote_id=q.id)}}">
+        <span class="home-priority-state {{'is-critical' if q.is_overdue else 'is-warning'}}" aria-hidden="true"></span>
+        <span class="home-priority-main">
+          <strong>{{q.d.cliente or 'Cliente sin nombre'}}</strong>
+          <small>{{q.number}} · {{request_status_labels.get(q.request_status,q.request_status)}}</small>
+        </span>
+        <span class="home-priority-reason">
+          {% if q.is_overdue %}{{q.overdue_reason}}
+          {% elif q.request_status=='pendiente_asignacion' %}Esperando asignación
+          {% elif q.days_to_due==0 %}Vence hoy
+          {% elif q.days_to_due==1 %}Vence mañana
+          {% else %}Vence en {{q.days_to_due}} días{% endif %}
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="home-empty-state">
+      <strong>Todo al día</strong>
+      <p>No hay atrasos, asignaciones pendientes ni vencimientos cercanos.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="panel home-pulse-panel">
+    <div class="home-section-heading">
+      <div>
+        <span class="home-section-kicker">Panorama</span>
+        <h2>Pulso de solicitudes</h2>
+        <p>{{total_quotes}} {{'solicitud visible' if total_quotes == 1 else 'solicitudes visibles'}} según tu rol.</p>
+      </div>
+    </div>
+    {% if request_breakdown %}
+    <div class="home-breakdown" aria-label="Distribución por etapa">
+      {% for item in request_breakdown %}
+      <div class="home-breakdown-item">
+        <div><span>{{item.label}}</span><strong>{{item.count}}</strong></div>
+        <div class="home-progress" role="progressbar" aria-label="{{item.label}}" aria-valuenow="{{item.percent}}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{item.percent}}%"></span></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="home-empty-state compact"><p>Aún no hay solicitudes para resumir.</p></div>
+    {% endif %}
+    {% if win_rate is not none %}
+    <div class="home-conversion"><span>Conversión comercial</span><strong>{{win_rate}}%</strong><small>sobre {{decided_count}} negocios adjudicados o perdidos</small></div>
+    {% endif %}
+  </section>
 </div>
 
-<section class="panel"><h2>Actividad reciente</h2><div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Cotizador</th><th>Estado solicitud</th><th>Plazo</th><th>Total</th></tr></thead><tbody>{% for q in recent %}<tr><td><a href="{{url_for('quotes.detail',quote_id=q.id)}}">{{q.number}}</a></td><td>{{q.d.cliente}}</td><td>{{q.estimator_name or 'Sin asignar'}}</td><td class="workflow">{{request_status_labels.get(q.request_status,q.request_status)}}</td><td>{% if q.is_overdue %}<span class="pill overdue">Atrasada</span>{% else %}{{q.age_label}}{% endif %}</td><td>{{q.currency or ''}} {{format_amount(q.total,q.currency) if q.total else ''}}</td></tr>{% else %}<tr><td colspan="6">Sin solicitudes.</td></tr>{% endfor %}</tbody></table></div></section>
+{% if active_totals or commercial_breakdown %}
+<section class="panel home-commercial-panel">
+  <div class="home-section-heading">
+    <div>
+      <span class="home-section-kicker">Comercial</span>
+      <h2>Negocios en curso</h2>
+      <p>Valores y estados abiertos; no incluye negocios adjudicados, perdidos o anulados.</p>
+    </div>
+  </div>
+  <div class="home-commercial-layout">
+    <div class="home-value-grid">
+      {% for currency,total in active_totals.items() %}
+      <div class="home-value-card"><span>Valor activo {{currency}}</span><strong>{{format_amount(total,currency)}}</strong></div>
+      {% else %}
+      <div class="home-empty-state compact"><p>Las cotizaciones en curso todavía no tienen montos registrados.</p></div>
+      {% endfor %}
+    </div>
+    {% if commercial_breakdown %}
+    <div class="home-status-list">
+      {% for item in commercial_breakdown %}
+      <div><span>{{item.label}}</span><strong>{{item.count}}</strong></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<section class="panel home-recent-panel">
+  <div class="home-section-heading">
+    <div>
+      <span class="home-section-kicker">Seguimiento</span>
+      <h2>Actividad reciente</h2>
+      <p>Las últimas solicitudes visibles para tu perfil.</p>
+    </div>
+    <a href="{{url_for('quotes.index')}}">Abrir listado completo</a>
+  </div>
+  <div class="scroll">
+    <table class="home-recent-table">
+      <thead><tr><th>Solicitud</th><th>Cliente</th><th>Responsable</th><th>Estado</th><th>Plazo</th><th>Total</th></tr></thead>
+      <tbody>{% for q in recent %}
+        <tr>
+          <td><a href="{{url_for('quotes.detail',quote_id=q.id)}}"><strong>{{q.number}}</strong></a><small>{{q.age_label}}</small></td>
+          <td>{{q.d.cliente or 'Sin cliente'}}</td>
+          <td>{{q.estimator_name or 'Sin asignar'}}</td>
+          <td><span class="pill">{{request_status_labels.get(q.request_status,q.request_status)}}</span></td>
+          <td>{% if q.is_overdue %}<span class="pill overdue">Atrasada</span>{% elif q.target_date %}{{q.target_date|local_date}}{% else %}<span class="muted">Sin fecha</span>{% endif %}</td>
+          <td class="money">{% if q.total %}{{q.currency}} {{format_amount(q.total,q.currency)}}{% else %}<span class="muted">Sin monto</span>{% endif %}</td>
+        </tr>
+      {% else %}<tr><td colspan="6"><div class="home-empty-state compact"><strong>Sin actividad todavía</strong><p>Crea la primera solicitud para comenzar.</p></div></td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

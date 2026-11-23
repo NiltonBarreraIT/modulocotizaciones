@@ -184,6 +184,8 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn("Cotización atrasada", dashboard)
         self.assertIn("Pendiente de tomar fuera de plazo", dashboard)
         self.assertIn("Fecha límite vencida", dashboard)
+        self.assertIn("Centro de gestión", dashboard)
+        self.assertIn("Prioridades", dashboard)
 
         overdue = admin.get("/?timing=atrasadas").get_data(as_text=True)
         self.assertIn("Pendiente atrasada", overdue)
@@ -201,6 +203,25 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn("Atrasada", detail)
 
         self.assertNotEqual(fresh, old_pending)
+
+    def test_dashboard_is_the_home_after_login(self):
+        client = self.app.test_client()
+        client.get("/login")
+        with client.session_transaction() as session:
+            csrf = session["csrf"]
+        response = client.post(
+            "/login",
+            data={
+                "csrf": csrf,
+                "username": "admin",
+                "password": "AdminPassword123!",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/dashboard"))
+        page = client.get(response.headers["Location"]).get_data(as_text=True)
+        self.assertIn(">Inicio</a>", page)
+        self.assertNotIn(">Tablero</a>", page)
 
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")
