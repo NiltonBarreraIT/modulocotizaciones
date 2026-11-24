@@ -214,9 +214,10 @@ def dashboard():
         if status_counts[label]
     ]
     won_count = status_counts["Adjudicada"]
-    lost_count = status_counts["Perdida"]
-    decided_count = won_count + lost_count
-    win_rate = round(won_count * 100 / decided_count) if decided_count else None
+    non_reference_count = commercial_total_quotes - status_counts["Referencial"]
+    win_rate = (
+        round(won_count * 100 / non_reference_count) if non_reference_count else None
+    )
     seller_wins = Counter()
     seller_labels = {}
     for row in commercial_rows:
@@ -260,7 +261,7 @@ def dashboard():
         selected_year=selected_year,
         win_rate=win_rate,
         won_count=won_count,
-        decided_count=decided_count,
+        non_reference_count=non_reference_count,
         active_business_count=active_business_count,
         top_sellers=top_sellers,
         pending_count=pending_count,

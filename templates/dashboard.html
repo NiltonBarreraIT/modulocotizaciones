@@ -70,7 +70,7 @@
   <div class="home-metric">
     <span class="home-metric-label">Tasa de adjudicación</span>
     <strong>{{win_rate ~ '%' if win_rate is not none else '—'}}</strong>
-    <small>{% if decided_count %}Sobre {{decided_count}} negocios decididos{% else %}Sin negocios decididos{% endif %}</small>
+    <small>{% if non_reference_count %}Sobre todas las cotizaciones menos referenciales{% else %}Sin cotizaciones no referenciales{% endif %}</small>
   </div>
   <div class="home-metric">
     <span class="home-metric-label">Negocios abiertos</span>

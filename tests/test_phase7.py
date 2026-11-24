@@ -350,6 +350,35 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn('data-seller="Hector Martinez"', older_seller_panel)
         self.assertNotIn("Ana Comercial", older_seller_panel)
 
+    def test_dashboard_award_rate_excludes_referential_quotes(self):
+        seller, csrf = self.login("vendedor")
+        quote_ids = [
+            self.create_request(seller, csrf, f"Cotización {index}", "2026-06-01")
+            for index in range(1, 5)
+        ]
+        statuses = ["Adjudicada", "Adjudicada", "Referencial", "Perdida"]
+        with self.app.app_context(), connection() as database:
+            for quote_id, status in zip(quote_ids, statuses, strict=True):
+                quote = database.execute(
+                    "SELECT data FROM quotes WHERE id=?", (quote_id,)
+                ).fetchone()
+                data = json.loads(quote["data"])
+                data["estado"] = status
+                data["vendedor"] = "Vendedor Prueba"
+                database.execute(
+                    "UPDATE quotes SET data=?,request_status='registrada' WHERE id=?",
+                    (json.dumps(data, ensure_ascii=False), quote_id),
+                )
+
+        dashboard = seller.get("/dashboard?year=2026").get_data(as_text=True)
+        rate_card = dashboard.split("Tasa de adjudicación", 1)[1].split(
+            "</div>", 1
+        )[0]
+        self.assertIn("67%", rate_card)
+        self.assertIn(
+            "Sobre todas las cotizaciones menos referenciales", rate_card
+        )
+
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")
         invalid = seller.post(
