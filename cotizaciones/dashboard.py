@@ -165,8 +165,9 @@ def dashboard():
     )
     active_totals = defaultdict(Decimal)
     active_commercial_statuses = set(STATUSES) - {"Adjudicada", "Perdida", "Anulada"}
+    active_business_statuses = active_commercial_statuses - {"Referencial"}
     active_business_count = sum(
-        row["d"].get("estado") in active_commercial_statuses for row in commercial_rows
+        status_counts[status] for status in active_business_statuses
     )
     for row in commercial_rows:
         if (

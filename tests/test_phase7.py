@@ -379,6 +379,30 @@ class PhaseSevenTests(unittest.TestCase):
             "Sobre todas las cotizaciones menos referenciales", rate_card
         )
 
+    def test_dashboard_open_businesses_excludes_reference_quotes(self):
+        seller, csrf = self.login("vendedor")
+        quote_ids = [
+            self.create_request(seller, csrf, f"Negocio {index}", "2026-07-01")
+            for index in range(1, 5)
+        ]
+        statuses = ["Abierta", "Referencial", "Postergada", "Enviada"]
+        with self.app.app_context(), connection() as database:
+            for quote_id, status in zip(quote_ids, statuses, strict=True):
+                quote = database.execute(
+                    "SELECT data FROM quotes WHERE id=?", (quote_id,)
+                ).fetchone()
+                data = json.loads(quote["data"])
+                data["estado"] = status
+                database.execute(
+                    "UPDATE quotes SET data=?,request_status='registrada' WHERE id=?",
+                    (json.dumps(data, ensure_ascii=False), quote_id),
+                )
+
+        dashboard = seller.get("/dashboard?year=2026").get_data(as_text=True)
+        open_card = dashboard.split("Negocios abiertos", 1)[1].split("</div>", 1)[0]
+        self.assertIn("<strong>3</strong>", open_card)
+        self.assertIn("Abiertos o en proceso, sin referenciales", open_card)
+
     def test_invalid_deadline_is_rejected_and_deadline_change_is_audited(self):
         seller, csrf = self.login("vendedor")
         invalid = seller.post(
