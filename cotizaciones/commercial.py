@@ -28,7 +28,6 @@ from .commercial_service import (
 from .db import connection, iso
 from .deadlines import local_today
 from .offer_docx import build_offer_docx
-from .pdf_builder import build_quote_pdf
 from .quotes import (
     can_access_quote,
     editable,
@@ -591,12 +590,8 @@ def quote_pdf(quote_id):
     try:
         content = convert_docx_to_pdf(offer_docx)
     except PdfConversionError as error:
-        current_app.logger.warning(
-            "No fue posible convertir la oferta con Microsoft Word; "
-            "se usará el generador PDF nativo: %s",
-            error,
-        )
-        content = build_quote_pdf(loaded_quote, commercial, items)
+        current_app.logger.exception("No fue posible convertir la oferta a PDF")
+        abort(503, str(error))
     return send_file(
         content,
         as_attachment=True,

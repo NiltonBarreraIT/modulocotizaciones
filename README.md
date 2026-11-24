@@ -80,6 +80,17 @@ python -m unittest discover -s tests -v
 python -m pip_audit -r requirements.txt
 ```
 
+En servidores Ubuntu, la conversión de la plantilla corporativa a PDF requiere
+LibreOffice Writer instalado en el sistema:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libreoffice-writer
+```
+
+En Windows se utiliza Microsoft Word mediante PowerShell. La aplicación no
+sustituye la plantilla corporativa por un diseño PDF alternativo.
+
 Las pruebas verifican CSRF y bloqueo de login, validaciones, cabeceras HTTP, neutralización de fórmulas, importaciones, auditoría, roles, aislamiento entre usuarios, ventana de edición, migraciones, concurrencia, filtros, paginación, duplicados, cálculos comerciales, versiones, aprobación, PDF, adjuntos, comentarios y tablero. El flujo `.github/workflows/ci.yml` ejecuta estos controles en cada cambio cuando el proyecto está alojado en GitHub.
 
 ## Arquitectura
