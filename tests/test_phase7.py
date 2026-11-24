@@ -298,25 +298,29 @@ class PhaseSevenTests(unittest.TestCase):
                 self.create_request(seller, csrf, "Adjudicada Ana 1", "2026-03-01"),
                 "Ana Comercial",
                 "2026-03-01",
+                {"clp": "1000000"},
             ),
             (
                 self.create_request(seller, csrf, "Adjudicada Ana 2", "2026-04-01"),
                 "ana comercial",
                 "2026-04-01",
+                {"clp": "2500000"},
             ),
             (
                 self.create_request(seller, csrf, "Adjudicada Mario", "2026-05-01"),
                 "Mario Ahumada",
                 "2026-05-01",
+                {"usd": "1500"},
             ),
             (
                 self.create_request(seller, csrf, "Adjudicada 2025", "2025-05-01"),
                 "Hector Martinez",
                 "2025-05-01",
+                {"clp": "900000"},
             ),
         ]
         with self.app.app_context(), connection() as database:
-            for quote_id, seller_name, quote_date in ranked_quotes:
+            for quote_id, seller_name, quote_date, amounts in ranked_quotes:
                 quote = database.execute(
                     "SELECT data FROM quotes WHERE id=?", (quote_id,)
                 ).fetchone()
@@ -324,6 +328,7 @@ class PhaseSevenTests(unittest.TestCase):
                 data["fecha"] = quote_date
                 data["estado"] = "Adjudicada"
                 data["vendedor"] = seller_name
+                data.update(amounts)
                 database.execute(
                     "UPDATE quotes SET data=?,request_status='registrada' WHERE id=?",
                     (json.dumps(data, ensure_ascii=False), quote_id),
@@ -336,7 +341,9 @@ class PhaseSevenTests(unittest.TestCase):
         self.assertIn("Top vendedores · 2026", seller_panel)
         self.assertIn('data-seller="Ana Comercial"', seller_panel)
         self.assertIn('class="dashboard-seller-count">2</strong>', seller_panel)
+        self.assertIn("CLP 3.500.000", seller_panel)
         self.assertIn('data-seller="Mario Ahumada"', seller_panel)
+        self.assertIn("USD 1.500,00", seller_panel)
         self.assertNotIn("Hector Martinez", seller_panel)
         self.assertLess(
             seller_panel.index("Ana Comercial"), seller_panel.index("Mario Ahumada")
@@ -435,7 +442,7 @@ class PhaseSevenTests(unittest.TestCase):
                 "descripcion": "Plazo corregido",
             },
         )
-        self.assertEqual(edited.status_code, 302)
+        self.assertEqual(edited.status_code, 403)
         with self.app.app_context(), connection() as database:
             saved = database.execute(
                 "SELECT due_date FROM quotes WHERE id=?", (quote_id,)
@@ -445,8 +452,8 @@ class PhaseSevenTests(unittest.TestCase):
                 WHERE quote_id=? AND action='actualizar_plazo'""",
                 (quote_id,),
             ).fetchone()
-        self.assertEqual(saved, "2026-11-20")
-        self.assertEqual(json.loads(event["after"])["due_date"], "2026-11-20")
+        self.assertEqual(saved, "2026-11-18")
+        self.assertIsNone(event)
 
 
 if __name__ == "__main__":

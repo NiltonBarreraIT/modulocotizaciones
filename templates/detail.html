@@ -5,8 +5,8 @@
   <div class="toolbar">
     <div>
       <h1>{{q.number}}</h1>
-      <p class="muted">Creada: {{q.created_at|local_datetime}} | Versión: {{q.version}}{% if me.role=='cotizador' and q.estimator_id==me.id %} | Edición asignada al cotizador{% elif me.role=='admin' %} | Acceso administrativo{% else %} | Vence edición: {{q.deadline|local_datetime}}{% endif %}</p>
-      <span class="pill {{'open' if can_edit else 'lock'}}">{{'Edición habilitada' if can_edit else 'Edición bloqueada'}}</span>
+      <p class="muted">Creada: {{q.created_at|local_datetime}} | Versión: {{q.version}}{% if me.role=='cotizador' and q.estimator_id==me.id %} | Edición asignada al cotizador{% elif me.role=='admin' %} | Acceso administrativo{% elif me.role=='usuario' %} | Acceso de solo lectura{% endif %}</p>
+      <span class="pill {{'open' if can_edit else 'lock'}}">{{'Edición habilitada' if can_edit else 'Solo lectura' if me.role=='usuario' else 'Edición bloqueada'}}</span>
       <span class="pill workflow">Solicitud: {{q.request_status_label}}</span>
       {% if q.is_overdue %}<span class="pill overdue" title="{{q.overdue_reason}}">Atrasada</span>{% endif %}
       {% if not is_pending_request %}<span class="pill workflow">Aprobación: {{q.workflow_status.replace('_',' ')}}</span>{% endif %}
@@ -24,15 +24,15 @@
   {% if me.role=='admin' and q.request_status in ['pendiente_asignacion','en_cotizacion'] %}
   <form method="post" action="{{url_for('quotes.reassign_request',quote_id=q.id)}}" class="assignment-form"><input type="hidden" name="csrf" value="{{csrf}}"><div><label for="estimator_id">Asignar cotizador</label><select id="estimator_id" name="estimator_id"><option value="">Sin asignar</option>{% for estimator in estimators %}<option value="{{estimator.id}}" {{'selected' if q.estimator_id==estimator.id else ''}}>{{estimator.display_name}}{{' (' + estimator.email + ')' if estimator.email and estimator.display_name != estimator.email else ''}}</option>{% endfor %}</select></div><button>Actualizar asignación</button></form>
   {% endif %}
-  {% if (me.role=='admin' or (me.role=='usuario' and q.owner_id==me.id)) and q.d.estado %}
+  {% if me.role=='admin' and q.d.estado %}
   <form method="post" action="{{url_for('quotes.update_commercial_status',quote_id=q.id)}}" class="commercial-status-form" data-commercial-status-form data-current-status="{{q.d.estado}}">
     <input type="hidden" name="csrf" value="{{csrf}}">
-    <div><label for="commercial-status">Estado comercial</label><select id="commercial-status" name="estado" data-commercial-status>{% if q.d.estado and q.d.estado not in seller_commercial_statuses %}<option selected>{{q.d.estado}}</option>{% endif %}{% for status in (statuses if me.role=='admin' else seller_commercial_statuses) %}<option value="{{status}}" {{'selected' if q.d.estado==status else ''}}>{{status}}</option>{% endfor %}</select></div>
+    <div><label for="commercial-status">Estado comercial</label><select id="commercial-status" name="estado" data-commercial-status>{% if q.d.estado and q.d.estado not in statuses %}<option selected>{{q.d.estado}}</option>{% endif %}{% for status in statuses %}<option value="{{status}}" {{'selected' if q.d.estado==status else ''}}>{{status}}</option>{% endfor %}</select></div>
     <div class="status-reason"><label for="status-reason" data-status-reason-label>Justificación del cambio</label><textarea id="status-reason" name="justificacion" rows="2" maxlength="1000" data-status-reason placeholder="Ingrese la justificación del cambio"></textarea></div>
     <button>Actualizar estado</button>
   </form>
   {% if q.d.estado=='Adjudicada' and q.d.get('orden_compra') %}<p class="muted"><b>Orden de compra:</b> {{q.d.orden_compra}}</p>{% endif %}
-  {% elif me.role=='admin' or (me.role=='usuario' and q.owner_id==me.id) %}
+  {% elif me.role=='admin' %}
   <p class="muted"><b>Estado comercial:</b> Se habilitará como Abierta cuando el cotizador entregue la oferta.</p>
   {% endif %}
   {% if not is_pending_request %}
@@ -49,7 +49,7 @@
   <div class="toolbar workflow-actions">
     <div class="item-actions">
       {% if me.role=='cotizador' and q.estimator_id==me.id and q.workflow_status in ['borrador','rechazada'] %}<form method="post" action="{{url_for('commercial.workflow',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="submit"><button>Solicitar aprobación</button></form>{% endif %}
-      {% if q.workflow_status=='aprobada' %}<form method="post" action="{{url_for('commercial.workflow',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="send"><button>Marcar enviada</button></form>{% endif %}
+      {% if me.role!='usuario' and q.workflow_status=='aprobada' %}<form method="post" action="{{url_for('commercial.workflow',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="send"><button>Marcar enviada</button></form>{% endif %}
       {% if me.role=='admin' and q.workflow_status!='borrador' %}<form method="post" action="{{url_for('commercial.workflow',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="reopen"><button class="secondary">Reabrir borrador</button></form>{% endif %}
     </div>
   </div>
@@ -99,7 +99,7 @@
       <p><button class="secondary">Solicitar información</button></p>
     </form>
   </div>
-  {% elif q.request_status=='requiere_informacion' and (q.owner_id==me.id or me.role=='admin') %}
+  {% elif q.request_status=='requiere_informacion' and me.role=='admin' %}
   <p class="muted">El cotizador necesita información adicional. Responde aquí para devolver la solicitud a cotización.</p>
   <form method="post" action="{{url_for('commercial.request_workflow',quote_id=q.id)}}">
     <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="resume">
@@ -107,15 +107,17 @@
     <textarea id="information-response" name="body" rows="4" maxlength="2000" required></textarea>
     <p><button>Enviar información al cotizador</button></p>
   </form>
-  {% elif q.request_status=='entregada' and (q.owner_id==me.id or me.role=='admin') %}
+  {% elif q.request_status=='entregada' and me.role in ['admin','usuario'] %}
   <p><b>La oferta está disponible para descarga.</b></p>
   {% if deliveries %}<p><a class="btn" href="{{url_for('commercial.download_attachment',quote_id=q.id,attachment_id=deliveries[0].attachment_id)}}">Descargar última oferta Word</a></p>{% endif %}
+  {% if me.role=='admin' %}
   <form method="post" action="{{url_for('commercial.request_workflow',quote_id=q.id)}}">
     <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="correction">
     <label for="correction-request">Corrección solicitada</label>
     <textarea id="correction-request" name="body" rows="4" maxlength="2000" required></textarea>
     <p><button class="secondary">Solicitar corrección</button></p>
   </form>
+  {% endif %}
   {% else %}
   <p class="muted">Estado actual: {{q.request_status_label}}.</p>
   {% endif %}
@@ -146,12 +148,12 @@
 <div class="compare">
   <section class="panel">
     <h2>Comentarios internos</h2>
-    <form method="post" action="{{url_for('commercial.add_comment',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><textarea name="body" rows="3" maxlength="2000" required placeholder="Agregar comentario"></textarea><p><button>Comentar</button></p></form>
+    {% if me.role!='usuario' %}<form method="post" action="{{url_for('commercial.add_comment',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><textarea name="body" rows="3" maxlength="2000" required placeholder="Agregar comentario"></textarea><p><button>Comentar</button></p></form>{% endif %}
     {% for comment in comments %}<div class="comment"><b>{{comment.username or 'Sistema'}}</b> <span class="muted">{{comment.created_at|local_datetime}}</span><div>{{comment.body}}</div></div>{% else %}<p class="muted">Sin comentarios.</p>{% endfor %}
   </section>
   <section class="panel">
     <h2>Adjuntos</h2>
-    <form method="post" enctype="multipart/form-data" action="{{url_for('commercial.add_attachment',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="file" name="file" accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg" required><p><button>Subir archivo</button></p></form>
+    {% if me.role!='usuario' %}<form method="post" enctype="multipart/form-data" action="{{url_for('commercial.add_attachment',quote_id=q.id)}}"><input type="hidden" name="csrf" value="{{csrf}}"><input type="file" name="file" accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg" required><p><button>Subir archivo</button></p></form>{% endif %}
     <ul>{% for attachment in attachments %}<li><a href="{{url_for('commercial.download_attachment',quote_id=q.id,attachment_id=attachment.id)}}">{{attachment.original_name}}</a> <span class="muted">{{attachment.size}} bytes · {{attachment.username}}</span></li>{% else %}<li class="muted">Sin adjuntos.</li>{% endfor %}</ul>
   </section>
 </div>

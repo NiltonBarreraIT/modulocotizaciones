@@ -115,7 +115,7 @@ class PhaseTwoTests(unittest.TestCase):
         content.seek(0)
         return content
 
-    def test_stale_edit_returns_conflict_without_overwriting(self):
+    def test_seller_cannot_edit_after_registering_request(self):
         client, token = self.login()
         quote_id = self.create_quote(client, token, "Cliente original")
         first = client.post(
@@ -127,18 +127,7 @@ class PhaseTwoTests(unittest.TestCase):
                 "descripcion": "Contenido guardado",
             },
         )
-        self.assertEqual(first.status_code, 302)
-        stale = client.post(
-            f"/quote/{quote_id}/edit",
-            data={
-                "csrf": token,
-                "version": "1",
-                "cliente": "Edición obsoleta",
-                "descripcion": "No debe guardarse",
-            },
-        )
-        self.assertEqual(stale.status_code, 409)
-        self.assertIn("No se sobrescribi", stale.get_data(as_text=True))
+        self.assertEqual(first.status_code, 403)
 
         with self.app.app_context(), connection() as database:
             quote = database.execute(
@@ -147,9 +136,9 @@ class PhaseTwoTests(unittest.TestCase):
             audit_count = database.execute(
                 "SELECT count(*) FROM audit WHERE quote_id=?", (quote_id,)
             ).fetchone()[0]
-        self.assertEqual(json.loads(quote["data"])["cliente"], "Primera edición")
-        self.assertEqual(quote["version"], 2)
-        self.assertEqual(audit_count, 2)
+        self.assertEqual(json.loads(quote["data"])["cliente"], "Cliente original")
+        self.assertEqual(quote["version"], 1)
+        self.assertEqual(audit_count, 1)
 
     def test_phase1_database_migrates_without_losing_quotes(self):
         legacy_path = os.path.join(self.tmp.name, "phase1.db")
@@ -219,7 +208,7 @@ class PhaseTwoTests(unittest.TestCase):
         self.assertIsNone(quote["fingerprint"])
         self.assertIsNotNone(version)
 
-    def test_status_transitions_and_audit_differences(self):
+    def test_seller_cannot_edit_or_change_commercial_status(self):
         client, token = self.login()
         quote_id = self.create_quote(client, token, "Cliente", estado="Referencial")
         invalid = client.post(
@@ -232,18 +221,7 @@ class PhaseTwoTests(unittest.TestCase):
                 "estado": "Perdida",
             },
         )
-        self.assertEqual(invalid.status_code, 302)
-        valid = client.post(
-            f"/quote/{quote_id}/edit",
-            data={
-                "csrf": token,
-                "version": "2",
-                "cliente": "Cliente actualizado",
-                "descripcion": "Descripción",
-                "estado": "Enviada",
-            },
-        )
-        self.assertEqual(valid.status_code, 302)
+        self.assertEqual(invalid.status_code, 403)
         with self.app.app_context(), connection() as database:
             row = database.execute(
                 "SELECT data FROM quotes WHERE id=?", (quote_id,)
@@ -262,11 +240,11 @@ class PhaseTwoTests(unittest.TestCase):
                 "justificacion": "Cliente solicitó revisar el proyecto más adelante.",
             },
         )
-        self.assertEqual(status_change.status_code, 302)
+        self.assertEqual(status_change.status_code, 403)
         detail = client.get(f"/quote/{quote_id}").get_data(as_text=True)
-        self.assertIn("Cliente actualizado", detail)
+        self.assertIn("Cliente", detail)
         self.assertIn("Abierta", detail)
-        self.assertIn("Postergada", detail)
+        self.assertNotIn("Cliente actualizado", detail)
 
     def test_filters_and_pagination(self):
         client, token = self.login()

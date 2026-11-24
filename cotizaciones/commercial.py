@@ -227,16 +227,12 @@ def request_workflow(quote_id):
         new_status = "requiere_informacion"
         audit_action = "solicitar_informacion"
     elif action == "resume":
-        if (user["role"] != "admin" and quote["owner_id"] != user["id"]) or quote[
-            "request_status"
-        ] != "requiere_informacion":
+        if user["role"] != "admin" or quote["request_status"] != "requiere_informacion":
             abort(403)
         new_status = "en_cotizacion"
         audit_action = "informacion_enviada"
     elif action == "correction":
-        if (user["role"] != "admin" and quote["owner_id"] != user["id"]) or quote[
-            "request_status"
-        ] != "entregada":
+        if user["role"] != "admin" or quote["request_status"] != "entregada":
             abort(403)
         new_status = "en_correccion"
         audit_action = "solicitar_correccion"
@@ -376,6 +372,8 @@ def commercial_form(quote_id):
 @login_required
 def workflow(quote_id):
     quote, user = _authorized_quote(quote_id)
+    if user["role"] == "usuario":
+        abort(403, "El perfil vendedor tiene acceso de solo lectura")
     action = request.form.get("action", "")
     with connection() as database:
         database.execute("BEGIN IMMEDIATE")
@@ -499,6 +497,8 @@ def workflow(quote_id):
 @login_required
 def add_comment(quote_id):
     _, user = _authorized_quote(quote_id)
+    if user["role"] == "usuario":
+        abort(403, "El perfil vendedor tiene acceso de solo lectura")
     body = request.form.get("body", "").strip()
     if not body:
         abort(400, "El comentario no puede estar vacío")
@@ -517,6 +517,8 @@ def add_comment(quote_id):
 @login_required
 def add_attachment(quote_id):
     _, user = _authorized_quote(quote_id)
+    if user["role"] == "usuario":
+        abort(403, "El perfil vendedor tiene acceso de solo lectura")
     attachment = store_attachment(request.files.get("file"), required=True)
     try:
         with connection() as database:

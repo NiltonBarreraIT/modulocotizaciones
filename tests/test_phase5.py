@@ -115,8 +115,8 @@ class PhaseFiveTests(unittest.TestCase):
 
         conflict = emilio.post(f"/quote/{quote_id}/take", data={"csrf": emilio_token})
         self.assertEqual(conflict.status_code, 409)
-        self.assertEqual(emilio.get(f"/quote/{quote_id}").status_code, 403)
-        self.assertNotIn("Cliente asignación", emilio.get("/").get_data(as_text=True))
+        self.assertEqual(emilio.get(f"/quote/{quote_id}").status_code, 200)
+        self.assertIn("Cliente asignación", emilio.get("/").get_data(as_text=True))
 
         admin, admin_token = self.login("admin", "AdminPassword123!")
         admin_detail = admin.get(f"/quote/{quote_id}").get_data(as_text=True)
@@ -135,7 +135,7 @@ class PhaseFiveTests(unittest.TestCase):
             },
         )
         self.assertEqual(reassigned.status_code, 302)
-        self.assertEqual(jean.get(f"/quote/{quote_id}").status_code, 403)
+        self.assertEqual(jean.get(f"/quote/{quote_id}").status_code, 200)
         emilio_detail = emilio.get(f"/quote/{quote_id}")
         self.assertEqual(emilio_detail.status_code, 200)
         self.assertIn("emilio", emilio_detail.get_data(as_text=True))

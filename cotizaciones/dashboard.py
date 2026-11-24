@@ -9,6 +9,7 @@ from .auth import admin_required, current_user, login_required
 from .constants import STATUSES
 from .db import connection
 from .deadlines import ACTIVE_DUE_STATUSES, local_today, quote_timing
+from .quotes import belongs_to_seller
 
 bp = Blueprint("dashboard", __name__)
 
@@ -74,57 +75,23 @@ def approvals():
 def dashboard():
     user = current_user()
     with connection() as database:
-        if user["role"] == "admin":
-            quotes = database.execute(
-                """SELECT quotes.*,quote_commercial.currency,
-                quote_commercial.total,
-                COALESCE(NULLIF(trim(owner.first_name || ' ' ||
-                    owner.last_name), ''), owner.username) AS seller_name,
-                COALESCE(NULLIF(trim(estimator.first_name || ' ' ||
-                    estimator.last_name), ''), estimator.username)
-                    AS estimator_name
-                FROM quotes JOIN users AS owner ON owner.id=quotes.owner_id
-                LEFT JOIN users AS estimator ON estimator.id=quotes.estimator_id
-                LEFT JOIN quote_commercial
-                ON quote_commercial.quote_id=quotes.id
-                ORDER BY quotes.id DESC"""
-            ).fetchall()
-        elif user["role"] == "cotizador":
-            quotes = database.execute(
-                """SELECT quotes.*,quote_commercial.currency,
-                quote_commercial.total,
-                COALESCE(NULLIF(trim(owner.first_name || ' ' ||
-                    owner.last_name), ''), owner.username) AS seller_name,
-                COALESCE(NULLIF(trim(estimator.first_name || ' ' ||
-                    estimator.last_name), ''), estimator.username)
-                    AS estimator_name
-                FROM quotes JOIN users AS owner ON owner.id=quotes.owner_id
-                LEFT JOIN users AS estimator ON estimator.id=quotes.estimator_id
-                LEFT JOIN quote_commercial
-                ON quote_commercial.quote_id=quotes.id
-                WHERE quotes.request_status='pendiente_asignacion'
-                OR quotes.estimator_id=? ORDER BY quotes.id DESC""",
-                (user["id"],),
-            ).fetchall()
-        else:
-            quotes = database.execute(
-                """SELECT quotes.*,quote_commercial.currency,
-                quote_commercial.total,
-                COALESCE(NULLIF(trim(owner.first_name || ' ' ||
-                    owner.last_name), ''), owner.username) AS seller_name,
-                COALESCE(NULLIF(trim(estimator.first_name || ' ' ||
-                    estimator.last_name), ''), estimator.username)
-                    AS estimator_name
-                FROM quotes JOIN users AS owner ON owner.id=quotes.owner_id
-                LEFT JOIN users AS estimator ON estimator.id=quotes.estimator_id
-                LEFT JOIN quote_commercial
-                ON quote_commercial.quote_id=quotes.id
-                WHERE quotes.owner_id=? ORDER BY quotes.id DESC""",
-                (user["id"],),
-            ).fetchall()
+        quotes = database.execute(
+            """SELECT quotes.*,quote_commercial.currency,
+            quote_commercial.total,
+            COALESCE(NULLIF(trim(owner.first_name || ' ' ||
+                owner.last_name), ''), owner.username) AS seller_name,
+            COALESCE(NULLIF(trim(estimator.first_name || ' ' ||
+                estimator.last_name), ''), estimator.username)
+                AS estimator_name
+            FROM quotes JOIN users AS owner ON owner.id=quotes.owner_id
+            LEFT JOIN users AS estimator ON estimator.id=quotes.estimator_id
+            LEFT JOIN quote_commercial
+            ON quote_commercial.quote_id=quotes.id
+            ORDER BY quotes.id DESC"""
+        ).fetchall()
 
     today = local_today()
-    enriched = []
+    global_enriched = []
     for row in quotes:
         quote = dict(row) | {"d": json.loads(row["data"])}
         enriched_quote = quote | quote_timing(quote)
@@ -141,7 +108,13 @@ def dashboard():
         enriched_quote["display_currency"] = display_currency
         enriched_quote["display_total"] = display_total
         enriched_quote["commercial_year"] = _quote_year(enriched_quote)
-        enriched.append(enriched_quote)
+        global_enriched.append(enriched_quote)
+
+    enriched = (
+        [row for row in global_enriched if belongs_to_seller(row, user)]
+        if user["role"] == "usuario"
+        else global_enriched
+    )
 
     available_years = sorted(
         {row["commercial_year"] for row in enriched if row["commercial_year"]},
@@ -219,9 +192,13 @@ def dashboard():
     win_rate = (
         round(won_count * 100 / non_reference_count) if non_reference_count else None
     )
+    global_commercial_rows = [
+        row for row in global_enriched if row["commercial_year"] == selected_year
+    ]
     seller_wins = Counter()
     seller_labels = {}
-    for row in commercial_rows:
+    seller_totals = defaultdict(lambda: defaultdict(Decimal))
+    for row in global_commercial_rows:
         if row["d"].get("estado") != "Adjudicada":
             continue
         seller = " ".join(
@@ -231,8 +208,14 @@ def dashboard():
             continue
         seller_key = seller.casefold()
         seller_wins[seller_key] += 1
+        if row["display_currency"] and row["display_total"] is not None:
+            seller_totals[seller_key][row["display_currency"]] += row[
+                "display_total"
+            ]
         current_label = seller_labels.get(seller_key, "")
-        if sum(character.isupper() for character in seller) > sum(
+        if seller_key not in seller_labels or sum(
+            character.isupper() for character in seller
+        ) > sum(
             character.isupper() for character in current_label
         ):
             seller_labels[seller_key] = seller
@@ -246,6 +229,11 @@ def dashboard():
             "name": seller_labels[key],
             "count": count,
             "percent": round(count * 100 / top_seller_count),
+            "amounts": [
+                {"currency": currency, "total": seller_totals[key][currency]}
+                for currency in ("CLP", "USD", "EUR")
+                if seller_totals[key][currency]
+            ],
         }
         for key, count in ranked_sellers
     ]

@@ -122,7 +122,7 @@ class PhaseFourTests(unittest.TestCase):
 
         detail = client.get(response.headers["Location"]).get_data(as_text=True)
         self.assertIn("Pendiente de asignación", detail)
-        self.assertIn("Se habilitará como Abierta", detail)
+        self.assertIn("Solo lectura", detail)
         self.assertIn("antecedentes.docx", detail)
         self.assertIn("creó la solicitud", detail)
         self.assertNotIn("crear_solicitud", detail)
@@ -148,7 +148,7 @@ class PhaseFourTests(unittest.TestCase):
             count = database.execute("SELECT count(*) FROM quotes").fetchone()[0]
         self.assertEqual(count, 0)
 
-    def test_seller_updates_commercial_status_with_required_justification(self):
+    def test_seller_cannot_update_commercial_status(self):
         client, token = self.login()
         response = client.post(
             "/new",
@@ -168,88 +168,12 @@ class PhaseFourTests(unittest.TestCase):
                 "justificacion": "Aún no se entrega la oferta.",
             },
         )
-        self.assertEqual(blocked_before_delivery.status_code, 409)
+        self.assertEqual(blocked_before_delivery.status_code, 403)
         with self.app.app_context(), connection() as database:
-            current = database.execute(
+            saved = database.execute(
                 "SELECT data FROM quotes WHERE id=?", (quote_id,)
             ).fetchone()
-            delivered_data = json.loads(current["data"])
-            delivered_data["estado"] = "Abierta"
-            database.execute(
-                "UPDATE quotes SET request_status='entregada',data=? WHERE id=?",
-                (json.dumps(delivered_data, ensure_ascii=False), quote_id),
-            )
-
-        missing_reason = client.post(
-            f"/quote/{quote_id}/commercial-status",
-            data={"csrf": token, "estado": "Postergada", "justificacion": ""},
-        )
-        self.assertEqual(missing_reason.status_code, 400)
-
-        changed = client.post(
-            f"/quote/{quote_id}/commercial-status",
-            data={
-                "csrf": token,
-                "estado": "Postergada",
-                "justificacion": "El cliente reagendó el proyecto para enero.",
-            },
-        )
-        self.assertEqual(changed.status_code, 302)
-        with self.app.app_context(), connection() as database:
-            quote = database.execute(
-                "SELECT data FROM quotes WHERE id=?", (quote_id,)
-            ).fetchone()
-            event = database.execute(
-                """SELECT action,after FROM audit
-                WHERE quote_id=? ORDER BY id DESC LIMIT 1""",
-                (quote_id,),
-            ).fetchone()
-        self.assertEqual(json.loads(quote["data"])["estado"], "Postergada")
-        self.assertEqual(event["action"], "cambiar_estado_comercial")
-        self.assertIn("reagendó", json.loads(event["after"])["justificacion"])
-
-        missing_purchase_order = client.post(
-            f"/quote/{quote_id}/commercial-status",
-            data={"csrf": token, "estado": "Adjudicada", "justificacion": ""},
-        )
-        self.assertEqual(missing_purchase_order.status_code, 400)
-
-        awarded = client.post(
-            f"/quote/{quote_id}/commercial-status",
-            data={
-                "csrf": token,
-                "estado": "Adjudicada",
-                "justificacion": "OC-45001234",
-            },
-        )
-        self.assertEqual(awarded.status_code, 302)
-        with self.app.app_context(), connection() as database:
-            quote = database.execute(
-                "SELECT data FROM quotes WHERE id=?", (quote_id,)
-            ).fetchone()
-            event = database.execute(
-                """SELECT after FROM audit
-                WHERE quote_id=? ORDER BY id DESC LIMIT 1""",
-                (quote_id,),
-            ).fetchone()
-        self.assertEqual(json.loads(quote["data"])["orden_compra"], "OC-45001234")
-        self.assertEqual(json.loads(event["after"])["orden_compra"], "OC-45001234")
-        detail = client.get(f"/quote/{quote_id}").get_data(as_text=True)
-        self.assertIn("Adjudicada", detail)
-        self.assertIn("Orden de compra", detail)
-        self.assertIn("OC-45001234", detail)
-        self.assertIn("cambió el estado comercial", detail)
-
-        other, other_token = self.login("vendedor2")
-        forbidden = other.post(
-            f"/quote/{quote_id}/commercial-status",
-            data={
-                "csrf": other_token,
-                "estado": "Perdida",
-                "justificacion": "Sin adjudicación",
-            },
-        )
-        self.assertEqual(forbidden.status_code, 403)
+        self.assertEqual(json.loads(saved["data"])["estado"], "")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
   .dashboard-commercial-grid>.panel{margin:0}
   .dashboard-commercial-grid .home-breakdown{gap:12px}
   .dashboard-seller-list{display:grid;gap:10px}
-  .dashboard-seller-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--its-border)}
+  .dashboard-seller-row{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(135px,auto) auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--its-border)}
   .dashboard-seller-row:last-child{border-bottom:0}
   .dashboard-seller-rank{display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:var(--its-surface-active);color:var(--its-navy);font-size:14px;font-weight:800}
   .dashboard-seller-main{min-width:0}
@@ -14,13 +14,16 @@
   .dashboard-seller-bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--its-blue),var(--its-cyan-bright))}
   .dashboard-seller-count{min-width:34px;color:var(--its-ink);font-size:20px;text-align:right}
   .dashboard-seller-caption{display:block;margin-top:2px;color:var(--its-muted);font-size:12px;font-weight:500}
+  .dashboard-seller-amounts{display:grid;gap:2px;color:var(--its-ink);font-size:13px;text-align:right;white-space:nowrap}
+  .dashboard-seller-amounts span{color:var(--its-muted);font-weight:600}
   @media(max-width:1000px){.dashboard-commercial-grid{grid-template-columns:1fr}}
+  @media(max-width:600px){.dashboard-seller-row{grid-template-columns:30px minmax(0,1fr) auto}.dashboard-seller-amounts{grid-column:2/4;grid-row:2;text-align:left}.dashboard-seller-count{grid-column:3;grid-row:1}}
 </style>
 <section class="home-hero">
   <div class="home-hero-copy">
     <span class="home-eyebrow">Vista general</span>
     <h1>Centro de gestión</h1>
-    <p>Hola, {{me.display_name}}. {% if me.role=='admin' %}Aquí tienes el estado operativo y comercial de toda la plataforma.{% elif me.role=='cotizador' %}Aquí tienes tus asignaciones, plazos y solicitudes disponibles.{% else %}Aquí puedes seguir el avance de tus solicitudes y detectar lo que requiere atención.{% endif %}</p>
+    <p>Hola, {{me.display_name}}. {% if me.role=='admin' or me.role=='cotizador' %}Aquí tienes el estado operativo y comercial de toda la plataforma.{% else %}Aquí puedes consultar los resultados y cotizaciones asignados a ti.{% endif %}</p>
   </div>
   <div class="home-actions" aria-label="Acciones rápidas">
     <a class="btn" href="{{url_for('quotes.create')}}">Nueva solicitud</a>
@@ -174,6 +177,9 @@
           <span class="dashboard-seller-caption">{{'Cotización adjudicada' if seller.count == 1 else 'Cotizaciones adjudicadas'}}</span>
           <div class="dashboard-seller-bar" role="progressbar" aria-label="{{seller.name}}" aria-valuenow="{{seller.percent}}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{seller.percent}}%"></span></div>
         </div>
+        <div class="dashboard-seller-amounts" aria-label="Monto total adjudicado de {{seller.name}}">
+          {% for amount in seller.amounts %}<strong>{{amount.currency}} {{format_amount(amount.total,amount.currency)}}</strong>{% else %}<span>Sin monto registrado</span>{% endfor %}
+        </div>
         <strong class="dashboard-seller-count">{{seller.count}}</strong>
       </div>
       {% endfor %}
@@ -225,7 +231,7 @@
           <td>{% if q.is_overdue %}<span class="pill overdue">Atrasada</span>{% elif q.target_date %}{{q.target_date|local_date}}{% else %}<span class="muted">Sin fecha</span>{% endif %}</td>
           <td class="money">{% if q.display_total is not none %}{{q.display_currency}} {{format_amount(q.display_total,q.display_currency)}}{% else %}<span class="muted">Sin monto</span>{% endif %}</td>
         </tr>
-      {% else %}<tr><td colspan="7"><div class="home-empty-state compact"><strong>Sin solicitudes todavía</strong><p>Crea la primera solicitud para comenzar.</p></div></td></tr>{% endfor %}</tbody>
+      {% else %}<tr><td colspan="7"><div class="home-empty-state compact"><strong>Sin solicitudes visibles</strong><p>No hay cotizaciones asignadas a este perfil.</p></div></td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </section>

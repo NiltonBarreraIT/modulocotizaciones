@@ -99,6 +99,14 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         return int(response.headers["Location"].rsplit("/", 1)[-1])
 
+    def assign_estimator(self, quote_id):
+        with self.app.app_context(), connection() as database:
+            database.execute(
+                """UPDATE quotes SET estimator_id=?,request_status='en_cotizacion'
+                WHERE id=?""",
+                (self.user_ids["estimator"], quote_id),
+            )
+
     def save_commercial(
         self, client, token, quote_id, version=1, currency="USD", profit_usd="38,30"
     ):
@@ -133,8 +141,10 @@ class PhaseThreeTests(unittest.TestCase):
         )
 
     def test_commercial_calculation_versions_and_pdf(self):
-        client, token = self.login()
-        quote_id = self.create_quote(client, token)
+        owner, owner_token = self.login()
+        quote_id = self.create_quote(owner, owner_token)
+        self.assign_estimator(quote_id)
+        client, token = self.login("estimator")
         response = self.save_commercial(client, token, quote_id)
         self.assertEqual(response.status_code, 302)
 
@@ -277,8 +287,10 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertNotIn("FLUJÓMETRO ELECTROMAGNÉTICO", generated_text)
 
     def test_detail_only_shows_values_for_selected_clp_currency(self):
-        client, token = self.login()
-        quote_id = self.create_quote(client, token, "Cliente CLP")
+        owner, owner_token = self.login()
+        quote_id = self.create_quote(owner, owner_token, "Cliente CLP")
+        self.assign_estimator(quote_id)
+        client, token = self.login("estimator")
         response = self.save_commercial(
             client, token, quote_id, currency="CLP", profit_usd=""
         )
@@ -297,8 +309,10 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertIn("% utilidad", detail)
 
     def test_clp_thousands_are_parsed_and_displayed_with_dots(self):
-        client, token = self.login()
-        quote_id = self.create_quote(client, token, "Cliente CLP")
+        owner, owner_token = self.login()
+        quote_id = self.create_quote(owner, owner_token, "Cliente CLP")
+        self.assign_estimator(quote_id)
+        client, token = self.login("estimator")
         response = client.post(
             f"/quote/{quote_id}/commercial",
             data={
@@ -353,15 +367,11 @@ class PhaseThreeTests(unittest.TestCase):
     def test_approval_workflow_locks_and_sends_approved_version(self):
         owner, owner_token = self.login()
         quote_id = self.create_quote(owner, owner_token)
+        self.assign_estimator(quote_id)
+        estimator, estimator_token = self.login("estimator")
         self.assertEqual(
-            self.save_commercial(owner, owner_token, quote_id).status_code, 302
+            self.save_commercial(estimator, estimator_token, quote_id).status_code, 302
         )
-        with self.app.app_context(), connection() as database:
-            database.execute(
-                """UPDATE quotes SET estimator_id=?,request_status='en_cotizacion'
-                WHERE id=?""",
-                (self.user_ids["estimator"], quote_id),
-            )
         owner_detail = owner.get(f"/quote/{quote_id}").get_data(as_text=True)
         self.assertNotIn("Solicitar aprobación", owner_detail)
         forbidden = owner.post(
@@ -370,7 +380,6 @@ class PhaseThreeTests(unittest.TestCase):
         )
         self.assertEqual(forbidden.status_code, 403)
 
-        estimator, estimator_token = self.login("estimator")
         estimator_detail = estimator.get(f"/quote/{quote_id}").get_data(as_text=True)
         self.assertIn("Solicitar aprobación", estimator_detail)
         submitted = estimator.post(
@@ -405,9 +414,9 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertIn("0 pendiente(s)", approvals)
         self.assertNotIn("Cliente comercial", approvals)
 
-        sent = owner.post(
+        sent = estimator.post(
             f"/quote/{quote_id}/workflow",
-            data={"csrf": owner_token, "action": "send"},
+            data={"csrf": estimator_token, "action": "send"},
         )
         self.assertEqual(sent.status_code, 302)
         with self.app.app_context(), connection() as database:
@@ -423,17 +432,22 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertEqual(json.loads(status["data"])["estado"], "Abierta")
 
     def test_comments_attachments_permissions_and_dashboard(self):
-        owner, token = self.login()
-        quote_id = self.create_quote(owner, token, "Cliente tablero")
-        comment = owner.post(
+        owner, owner_token = self.login()
+        quote_id = self.create_quote(owner, owner_token, "Cliente tablero")
+        self.assign_estimator(quote_id)
+        estimator, estimator_token = self.login("estimator")
+        comment = estimator.post(
             f"/quote/{quote_id}/comments",
-            data={"csrf": token, "body": "Validar plazo con operaciones."},
+            data={
+                "csrf": estimator_token,
+                "body": "Validar plazo con operaciones.",
+            },
         )
         self.assertEqual(comment.status_code, 302)
-        upload = owner.post(
+        upload = estimator.post(
             f"/quote/{quote_id}/attachments",
             data={
-                "csrf": token,
+                "csrf": estimator_token,
                 "file": (BytesIO(b"%PDF-1.4\n% test attachment"), "respaldo.pdf"),
             },
             content_type="multipart/form-data",

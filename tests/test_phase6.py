@@ -60,7 +60,7 @@ class PhaseSixTests(unittest.TestCase):
             for filename in os.listdir(self.upload_folder):
                 os.unlink(os.path.join(self.upload_folder, filename))
 
-    def login(self, username):
+    def login(self, username, password="UserPassword123!"):
         client = self.app.test_client()
         client.get("/login")
         with client.session_transaction() as current_session:
@@ -70,7 +70,7 @@ class PhaseSixTests(unittest.TestCase):
             data={
                 "csrf": token,
                 "username": username,
-                "password": "UserPassword123!",
+                "password": password,
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -118,10 +118,11 @@ class PhaseSixTests(unittest.TestCase):
             },
         )
         self.assertEqual(information.status_code, 302)
-        response = seller.post(
+        admin, admin_token = self.login("admin", "AdminPassword123!")
+        response = admin.post(
             f"/quote/{quote_id}/request-workflow",
             data={
-                "csrf": seller_token,
+                "csrf": admin_token,
                 "action": "resume",
                 "body": "Entregar en bodega central del cliente.",
             },
@@ -184,10 +185,10 @@ class PhaseSixTests(unittest.TestCase):
         self.assertEqual(download.data, self.template_content)
         download.close()
 
-        correction = seller.post(
+        correction = admin.post(
             f"/quote/{quote_id}/request-workflow",
             data={
-                "csrf": seller_token,
+                "csrf": admin_token,
                 "action": "correction",
                 "body": "Corregir plazo de entrega a seis semanas.",
             },

@@ -25,11 +25,10 @@ from .constants import (
     FIELDS,
     INITIAL_STATUSES,
     REQUEST_STATUS_LABELS,
-    SELLER_COMMERCIAL_STATUSES,
     STATUS_TRANSITIONS,
     STATUSES,
 )
-from .db import connection, iso, now
+from .db import connection, iso
 from .deadlines import overdue_sql_condition, overdue_sql_parameters, quote_timing
 from .formatting import format_local_date, format_local_datetime
 from .numbering import next_correlative, quote_number
@@ -64,20 +63,41 @@ def editable(quote, user):
         return False
     if user["role"] == "cotizador":
         return quote["estimator_id"] == user["id"]
-    if quote["owner_id"] != user["id"]:
-        return False
-    return now() < datetime.fromisoformat(quote["last_user_edit_at"]) + timedelta(
-        hours=24
+    return False
+
+
+def _normalized_seller(value):
+    return " ".join(str(value or "").split()).casefold()
+
+
+def belongs_to_seller(quote, user):
+    """Support current ownership and historical imports assigned by seller name."""
+    if quote["owner_id"] == user["id"]:
+        return True
+    data = json.loads(quote["data"])
+    assigned_seller = _normalized_seller(data.get("vendedor"))
+    identities = {
+        _normalized_seller(user["display_name"]),
+        _normalized_seller(user["username"]),
+    }
+    identities.discard("")
+    return assigned_seller in identities
+
+
+def seller_scope_sql(user, table="quotes"):
+    """Return a portable SQL predicate for a salesperson's visible quotes."""
+    seller_field = f"json_extract({table}.data,'$.vendedor')"
+    return (
+        f"({table}.owner_id=? OR "
+        f"lower(trim(COALESCE({seller_field},''))) IN (lower(trim(?)),lower(trim(?))))",
+        [user["id"], user["display_name"], user["username"]],
     )
 
 
 def can_access_quote(quote, user):
-    if user["role"] == "admin" or quote["owner_id"] == user["id"]:
+    if user["role"] in ("admin", "cotizador"):
         return True
-    return user["role"] == "cotizador" and (
-        quote["request_status"] == "pendiente_asignacion"
-        or quote["estimator_id"] == user["id"]
-    )
+    return user["role"] == "usuario" and belongs_to_seller(quote, user)
 
 
 def deadline(quote):
@@ -456,12 +476,10 @@ def index():
 
     conditions = []
     parameters = []
-    if user["role"] == "cotizador":
-        conditions.append("(request_status='pendiente_asignacion' OR estimator_id=?)")
-        parameters.append(user["id"])
-    elif user["role"] != "admin":
-        conditions.append("owner_id=?")
-        parameters.append(user["id"])
+    if user["role"] == "usuario":
+        seller_condition, seller_parameters = seller_scope_sql(user)
+        conditions.append(seller_condition)
+        parameters.extend(seller_parameters)
     if filters["q"]:
         pattern = f"%{filters['q'].lower()}%"
         conditions.append(
@@ -739,15 +757,13 @@ def take_request(quote_id):
 @bp.route("/quote/<int:quote_id>/commercial-status", methods=["POST"])
 @login_required
 def update_commercial_status(quote_id):
-    quote = get_quote(quote_id)
+    get_quote(quote_id)
     user = current_user()
-    is_owner = user["role"] == "usuario" and quote["owner_id"] == user["id"]
-    if user["role"] != "admin" and not is_owner:
+    if user["role"] != "admin":
         abort(403)
 
     new_status = request.form.get("estado", "").strip()
-    allowed = STATUSES if user["role"] == "admin" else SELLER_COMMERCIAL_STATUSES
-    if new_status not in allowed:
+    if new_status not in STATUSES:
         abort(400, "Estado comercial inválido")
     justification = request.form.get("justificacion", "").strip()
 
@@ -1043,12 +1059,13 @@ def export():
         LEFT JOIN users AS technical_user
         ON technical_user.id=quote_commercial.technical_support_user_id"""
     with connection() as database:
-        if user["role"] == "admin":
+        if user["role"] in ("admin", "cotizador"):
             rows = database.execute(export_query + " ORDER BY quotes.id").fetchall()
         else:
+            seller_condition, seller_parameters = seller_scope_sql(user)
             rows = database.execute(
-                export_query + " WHERE quotes.owner_id=? ORDER BY quotes.id",
-                (user["id"],),
+                export_query + " WHERE " + seller_condition + " ORDER BY quotes.id",
+                seller_parameters,
             ).fetchall()
     for quote in rows:
         data = json.loads(quote["data"])
