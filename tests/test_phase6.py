@@ -105,7 +105,7 @@ class PhaseSixTests(unittest.TestCase):
         self.assertEqual(template.status_code, 200)
         self.assertEqual(
             hashlib.sha256(template.data).hexdigest(),
-            "200e8c0e9fbd30c9666adefff65a2562bf9d2e484ebecedbcd4417e8663c646a",
+            "3e48cf219b9f97db814298a4fe68823fd8f89b0b80bfd90d7dada7868d0cc96b",
         )
         template.close()
 

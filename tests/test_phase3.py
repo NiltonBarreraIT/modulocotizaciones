@@ -265,6 +265,10 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertIn("4 semanas desde la orden de compra", generated_text)
         with ZipFile(BytesIO(word.data)) as package:
             document_xml = package.read("word/document.xml").decode("utf-8")
+            embedded_fonts = [
+                name for name in package.namelist() if name.startswith("word/fonts/")
+            ]
+        self.assertEqual(len(embedded_fonts), 11)
         self.assertIn("Ana Comercial", document_xml)
         self.assertIn("ana.comercial@i-tsolutions.cl", document_xml)
         self.assertIn("+56 9 1111 1111", document_xml)

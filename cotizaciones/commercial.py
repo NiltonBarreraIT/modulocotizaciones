@@ -39,7 +39,7 @@ from .word_pdf import PdfConversionError, convert_docx_to_pdf
 
 bp = Blueprint("commercial", __name__)
 COMMERCIAL_TEMPLATE_SHA256 = (
-    "200e8c0e9fbd30c9666adefff65a2562bf9d2e484ebecedbcd4417e8663c646a"
+    "3e48cf219b9f97db814298a4fe68823fd8f89b0b80bfd90d7dada7868d0cc96b"
 )
 
 

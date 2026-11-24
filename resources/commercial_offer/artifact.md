@@ -4,7 +4,8 @@
 
 - Archivo fuente retenido: `C:\Users\nbarr\Downloads\ITS-3871-EC-CI-SQM-Rev.0-Oferta Comercial.docx`
 - Copia operativa: `resources/commercial_offer/formato_oferta_comercial_ITS.docx`
-- SHA-256 de ambos archivos: `200E8C0E9FBD30C9666ADEFFF65A2562BF9D2E484EBECEDBCD4417E8663C646A`
+- SHA-256 del archivo fuente: `200E8C0E9FBD30C9666ADEFFF65A2562BF9D2E484EBECEDBCD4417E8663C646A`.
+- SHA-256 de la copia operativa con tipografías incrustadas: `3E48CF219B9F97DB814298A4FE68823FD8F89B0B80BFD90D7DADA7868D0CC96B`.
 - Extensión visual verificada: 4 páginas.
 - Secciones OOXML: 6.
 - Render de evidencia: `C:\Users\nbarr\AppData\Local\Temp\its-phase6-template\reference-render`.
@@ -23,6 +24,7 @@
 - Conservar el logotipo azul ITS, lema, marca de agua gris, franja negra del pie, iconos, QR y datos de contacto.
 - Conservar las ocho imágenes flotantes y sus anclajes. `image1.png` corresponde al logotipo, `image8.png` a la marca de agua y `image9.png` a la imagen referencial del producto.
 - Familias observadas: Montserrat, Calibri y Arial. Los componentes de tabla usan además el estilo `Table Paragraph` basado en Century Gothic.
+- La copia operativa incrusta once subconjuntos tipográficos en `word/fonts` para impedir sustituciones por Liberation Sans o DejaVu Sans durante la conversión en Linux.
 - Título principal comercial: Heading 1, 18 pt, negrita, centrado y subrayado según el elemento fuente.
 - Encabezados de condiciones: Heading 2, 13 pt, negrita.
 - Etiquetas y subtítulos: Heading 3, 12 pt, negrita.
@@ -58,11 +60,12 @@
 
 - Preservar todos los elementos de `word/media`, el pie `word/footer1.xml` y su relación, `styles.xml`, `numbering.xml`, `theme1.xml`, `fontTable.xml`, `settings.xml`, footnotes/endnotes y los tres grupos `customXml`.
 - Preservar todas las relaciones y tipos de contenido. No convertir la plantilla mediante LibreOffice ni reconstruirla desde un documento vacío.
-- La copia operativa debe seguir coincidiendo byte por byte con el SHA-256 de referencia mientras se distribuya como formato oficial.
+- La copia operativa debe mantener su SHA-256 validado. Su única diferencia intencional frente a la fuente es la incrustación de tipografías realizada por Microsoft Word; su render Word es idéntico píxel por píxel al archivo fuente.
 
 ## Puertas de fidelidad
 
 - Comprobar SHA-256 antes de publicar o descargar la plantilla oficial.
+- Comprobar que estén presentes `word/fonts/font1.odttf` a `font11.odttf` y sus relaciones antes de publicar.
 - Renderizar e inspeccionar las cuatro páginas después de cualquier actualización autorizada del formato.
 - Verificar logotipo, marca de agua, tabla comercial, tablas de condiciones, franja de pie, QR y paginación.
 - Rechazar cualquier cambio no explicado en elementos protegidos o geometría de página.
