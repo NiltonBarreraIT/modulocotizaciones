@@ -469,6 +469,43 @@ tbody tr:hover td {
   justify-self: start;
 }
 
+.seller-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--its-border);
+  border-radius: 10px;
+}
+
+.seller-picker legend {
+  padding: 0 7px;
+  color: var(--its-navy);
+  font-weight: 700;
+}
+
+.seller-picker label {
+  display: flex;
+  align-items: start;
+  gap: 9px;
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--its-surface-soft);
+}
+
+.seller-picker input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.seller-picker small {
+  display: block;
+  color: var(--its-muted);
+  font-weight: 400;
+}
+
 .home-hero {
   display: flex;
   align-items: flex-end;

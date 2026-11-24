@@ -23,7 +23,17 @@
       </div>
       <div>
         <label for="cliente">Cliente</label>
-        <input id="cliente" name="cliente" value="{{values.get('cliente','')}}" maxlength="200" required>
+        <select id="cliente" name="client_id" required>
+          <option value="">Seleccionar cliente</option>
+          {% for client in client_options %}
+            <option value="{{client.id}}" {{'selected' if q and q.client_id==client.id}}>{{client.name}}{{' · RUT ' ~ client.tax_id if client.tax_id else ''}}{{' (inactivo)' if not client.active else ''}}</option>
+          {% endfor %}
+        </select>
+        {% if not client_options %}
+          <p class="muted field-help">No tiene clientes activos asignados. Solicite al administrador que configure su cartera.</p>
+        {% else %}
+          <p class="muted field-help">Solo se muestran los clientes autorizados para su cartera.</p>
+        {% endif %}
       </div>
       <div>
         <label for="due-date">Fecha límite de entrega (opcional)</label>
@@ -67,7 +77,7 @@
       </div>
     </div>
     {% endif %}
-    <p><button>{{'Registrar solicitud' if is_request_form and not q else 'Guardar cambios'}}</button> <a class="btn secondary" href="{{url_for('quotes.index')}}">Cancelar</a></p>
+    <p><button {{'disabled' if is_request_form and not client_options}}>{{'Registrar solicitud' if is_request_form and not q else 'Guardar cambios'}}</button> <a class="btn secondary" href="{{url_for('quotes.index')}}">Cancelar</a></p>
   </form>
 </section>
 {% endblock %}

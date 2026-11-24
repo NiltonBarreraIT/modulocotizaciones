@@ -22,6 +22,7 @@ _POSTGRES_LOCK_ID = 4_921_847_337
 _ID_TABLES = {
     "audit",
     "catalog_entries",
+    "clients",
     "quote_attachments",
     "quote_comments",
     "quote_deliveries",

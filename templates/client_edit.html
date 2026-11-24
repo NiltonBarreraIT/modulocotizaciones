@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <div class="toolbar users-heading">
+    <div><h1>Editar cliente</h1><p class="muted">Actualice los datos, el estado y la cartera autorizada.</p></div>
+    <span class="pill {{'open' if client.active else 'lock'}}">{{'Activo' if client.active else 'Inactivo'}}</span>
+  </div>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{csrf}}">
+    <div class="grid">
+      <div><label for="name">Razón social</label><input id="name" name="name" maxlength="200" value="{{client.name}}" required></div>
+      <div><label for="tax-id">RUT (opcional)</label><input id="tax-id" name="tax_id" maxlength="30" value="{{client.tax_id}}"></div>
+      <div><label for="active">Estado</label><select id="active" name="active"><option value="1" {{'selected' if client.active}}>Activo</option><option value="0" {{'selected' if not client.active}}>Inactivo</option></select></div>
+      <fieldset class="wide seller-picker">
+        <legend>Vendedores asociados</legend>
+        {% for seller in sellers %}
+          <label><input type="checkbox" name="seller_ids" value="{{seller.id}}" {{'checked' if seller.id in assigned}}> <span>{{seller.display_name}}{% if seller.email %} <small>{{seller.email}}</small>{% endif %}</span></label>
+        {% else %}
+          <p class="muted">No hay usuarios con rol vendedor disponibles.</p>
+        {% endfor %}
+      </fieldset>
+    </div>
+    <p><button>Guardar cambios</button> <a class="btn secondary" href="{{url_for('admin.clients')}}">Cancelar</a></p>
+  </form>
+</section>
+{% endblock %}

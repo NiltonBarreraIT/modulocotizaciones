@@ -81,9 +81,183 @@ def panel():
             "catalogs": database.execute(
                 "SELECT count(*) FROM catalog_entries WHERE active=1"
             ).fetchone()[0],
+            "clients": database.execute(
+                "SELECT count(*) FROM clients WHERE active=1"
+            ).fetchone()[0],
             "quotes": database.execute("SELECT count(*) FROM quotes").fetchone()[0],
         }
     return render_template("admin_panel.html", summary=summary)
+
+
+def _client_form():
+    name = " ".join(request.form.get("name", "").split())
+    tax_id = " ".join(request.form.get("tax_id", "").split()).upper()
+    if not name or len(name) > 200:
+        abort(400, "La razón social es obligatoria y admite hasta 200 caracteres")
+    if len(tax_id) > 30:
+        abort(400, "El RUT admite hasta 30 caracteres")
+    seller_ids = set()
+    for value in request.form.getlist("seller_ids"):
+        try:
+            seller_ids.add(int(value))
+        except ValueError:
+            abort(400, "Vendedor inválido")
+    return name, tax_id, seller_ids
+
+
+def _validate_sellers(database, seller_ids):
+    if not seller_ids:
+        return
+    placeholders = ",".join("?" for _ in seller_ids)
+    rows = database.execute(
+        f"""SELECT users.id FROM users
+        LEFT JOIN quote_estimators ON quote_estimators.user_id=users.id
+        WHERE users.role='usuario' AND quote_estimators.user_id IS NULL
+        AND users.id IN ({placeholders})""",
+        tuple(sorted(seller_ids)),
+    ).fetchall()
+    if {row["id"] for row in rows} != seller_ids:
+        abort(400, "Solo se pueden asignar usuarios con rol vendedor")
+
+
+def _replace_client_sellers(database, client_id, seller_ids):
+    _validate_sellers(database, seller_ids)
+    database.execute("DELETE FROM client_sellers WHERE client_id=?", (client_id,))
+    database.executemany(
+        "INSERT INTO client_sellers(client_id,user_id) VALUES(?,?)",
+        ((client_id, seller_id) for seller_id in sorted(seller_ids)),
+    )
+
+
+def _seller_options(database):
+    return database.execute(
+        """SELECT users.id,
+        COALESCE(NULLIF(trim(users.first_name || ' ' || users.last_name), ''),
+            users.username) AS display_name,
+        users.email FROM users
+        LEFT JOIN quote_estimators ON quote_estimators.user_id=users.id
+        WHERE users.role='usuario' AND quote_estimators.user_id IS NULL
+        ORDER BY display_name"""
+    ).fetchall()
+
+
+@bp.route("/clients", methods=["GET", "POST"])
+@admin_required
+def clients():
+    actor = current_user()
+    if request.method == "POST":
+        name, tax_id, seller_ids = _client_form()
+        try:
+            with connection() as database:
+                _validate_sellers(database, seller_ids)
+                timestamp = iso()
+                cursor = database.execute(
+                    """INSERT INTO clients(name,tax_id,active,created_at,updated_at)
+                    VALUES(?,?,1,?,?)""",
+                    (name, tax_id, timestamp, timestamp),
+                )
+                client_id = cursor.lastrowid
+                _replace_client_sellers(database, client_id, seller_ids)
+                database.execute(
+                    """INSERT INTO audit(quote_id,user_id,action,at,before,after)
+                    VALUES(NULL,?,?,?,?,?)""",
+                    (
+                        actor["id"],
+                        "crear_cliente",
+                        timestamp,
+                        None,
+                        json.dumps(
+                            {
+                                "id": client_id,
+                                "name": name,
+                                "tax_id": tax_id,
+                                "seller_ids": sorted(seller_ids),
+                            },
+                            ensure_ascii=False,
+                        ),
+                    ),
+                )
+            flash("Cliente creado y cartera asignada")
+            return redirect(url_for("admin.clients"))
+        except INTEGRITY_ERRORS:
+            flash("Ya existe un cliente con esa razón social o RUT")
+
+    with connection() as database:
+        rows = database.execute(
+            """SELECT clients.id,clients.name,clients.tax_id,clients.active,
+            count(client_sellers.user_id) AS seller_count
+            FROM clients LEFT JOIN client_sellers
+            ON client_sellers.client_id=clients.id
+            GROUP BY clients.id,clients.name,clients.tax_id,clients.active
+            ORDER BY clients.active DESC,clients.name"""
+        ).fetchall()
+        sellers = _seller_options(database)
+    return render_template("clients.html", clients=rows, sellers=sellers)
+
+
+@bp.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_client(client_id):
+    actor = current_user()
+    if request.method == "POST":
+        name, tax_id, seller_ids = _client_form()
+        active = 1 if request.form.get("active") == "1" else 0
+        try:
+            with connection() as database:
+                existing = database.execute(
+                    "SELECT * FROM clients WHERE id=?", (client_id,)
+                ).fetchone()
+                if not existing:
+                    abort(404)
+                _validate_sellers(database, seller_ids)
+                timestamp = iso()
+                database.execute(
+                    """UPDATE clients SET name=?,tax_id=?,active=?,updated_at=?
+                    WHERE id=?""",
+                    (name, tax_id, active, timestamp, client_id),
+                )
+                _replace_client_sellers(database, client_id, seller_ids)
+                database.execute(
+                    """INSERT INTO audit(quote_id,user_id,action,at,before,after)
+                    VALUES(NULL,?,?,?,?,?)""",
+                    (
+                        actor["id"],
+                        "editar_cliente",
+                        timestamp,
+                        json.dumps(dict(existing), ensure_ascii=False),
+                        json.dumps(
+                            {
+                                "id": client_id,
+                                "name": name,
+                                "tax_id": tax_id,
+                                "active": active,
+                                "seller_ids": sorted(seller_ids),
+                            },
+                            ensure_ascii=False,
+                        ),
+                    ),
+                )
+            flash("Cliente y vendedores asociados actualizados")
+            return redirect(url_for("admin.clients"))
+        except INTEGRITY_ERRORS:
+            flash("Ya existe un cliente con esa razón social o RUT")
+
+    with connection() as database:
+        client = database.execute(
+            "SELECT * FROM clients WHERE id=?", (client_id,)
+        ).fetchone()
+        if not client:
+            abort(404)
+        assigned = {
+            row["user_id"]
+            for row in database.execute(
+                "SELECT user_id FROM client_sellers WHERE client_id=?", (client_id,)
+            )
+        }
+        sellers = _seller_options(database)
+    return render_template(
+        "client_edit.html", client=client, sellers=sellers, assigned=assigned
+    )
 
 
 def _catalog_value():

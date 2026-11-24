@@ -113,6 +113,8 @@ Las pruebas verifican CSRF y bloqueo de login, validaciones, cabeceras HTTP, neu
 ## Reglas de acceso
 
 - Los usuarios creados desde la administración reciben una contraseña temporal y deben reemplazarla por otra de al menos 12 caracteres en su primer ingreso. Un administrador puede restablecerla y volver a exigir ese cambio.
+- **Cartera de clientes:** el administrador registra, activa o desactiva clientes y asigna uno o varios vendedores. Al crear una solicitud, cada vendedor solo puede seleccionar clientes activos de su cartera; la autorización vuelve a validarse en el servidor al guardar.
+- El nombre del cliente queda guardado como parte del histórico de la solicitud. Desactivar o renombrar el registro maestro no modifica cotizaciones anteriores.
 - **Usuario:** solo visualiza sus cotizaciones y las puede editar antes de 24 h desde **su último guardado**. Cada guardado suyo reinicia la ventana de 24 h.
 - **Administrador:** puede ver y editar todas las cotizaciones en cualquier momento. Sus cambios **no reabren** el plazo de los usuarios.
 - La validación ocurre en el **servidor**, incluso justo antes de guardar. Cambiar la hora del navegador no evita el bloqueo. El tiempo se guarda en UTC.

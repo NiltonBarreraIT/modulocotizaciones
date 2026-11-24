@@ -168,10 +168,66 @@ def validate_quote_data(data):
     return data
 
 
-def form_data():
-    return validate_quote_data(
-        {key: request.form.get(key, "").strip() for key, _, _ in FIELDS}
-    )
+def form_data(*, validate=True):
+    data = {key: request.form.get(key, "").strip() for key, _, _ in FIELDS}
+    return validate_quote_data(data) if validate else data
+
+
+def request_clients(user, current_client_id=None):
+    """Return the active client portfolio available to the connected user."""
+    with connection() as database:
+        if user["role"] == "admin":
+            parameters = []
+            condition = "clients.active=1"
+            if current_client_id:
+                condition = "(clients.active=1 OR clients.id=?)"
+                parameters.append(current_client_id)
+            return database.execute(
+                f"""SELECT clients.id,clients.name,clients.tax_id,clients.active
+                FROM clients WHERE {condition} ORDER BY clients.name""",
+                parameters,
+            ).fetchall()
+        return database.execute(
+            """SELECT clients.id,clients.name,clients.tax_id,clients.active
+            FROM clients JOIN client_sellers
+            ON client_sellers.client_id=clients.id
+            WHERE client_sellers.user_id=? AND clients.active=1
+            ORDER BY clients.name""",
+            (user["id"],),
+        ).fetchall()
+
+
+def resolve_request_client(database, user, fallback_name=""):
+    """Validate the selected client against the seller's server-side portfolio."""
+    raw_client_id = request.form.get("client_id", "").strip()
+    if not raw_client_id:
+        # Backwards compatibility for administrative integrations that predate
+        # the client registry. Until the administrator creates the first client,
+        # legacy requests can still arrive; the browser UI remains disabled.
+        registry_is_empty = not database.execute(
+            "SELECT 1 FROM clients LIMIT 1"
+        ).fetchone()
+        if fallback_name and (user["role"] == "admin" or registry_is_empty):
+            return None, fallback_name
+        abort(400, "Debe seleccionar un cliente de su cartera")
+    try:
+        client_id = int(raw_client_id)
+    except ValueError:
+        abort(400, "Cliente inválido")
+    if user["role"] == "admin":
+        client = database.execute(
+            "SELECT id,name FROM clients WHERE id=? AND active=1", (client_id,)
+        ).fetchone()
+    else:
+        client = database.execute(
+            """SELECT clients.id,clients.name FROM clients
+            JOIN client_sellers ON client_sellers.client_id=clients.id
+            WHERE clients.id=? AND client_sellers.user_id=? AND clients.active=1""",
+            (client_id, user["id"]),
+        ).fetchone()
+    if not client:
+        abort(403, "El cliente no está activo o no pertenece a su cartera")
+    return client["id"], client["name"]
 
 
 def quote_fingerprint(data):
@@ -561,7 +617,13 @@ def create():
     user = current_user()
     available_statuses = allowed_statuses("", user, creating=True)
     if request.method == "POST":
-        data = form_data()
+        data = form_data(validate=False)
+        with connection() as database:
+            client_id, client_name = resolve_request_client(
+                database, user, data["cliente"]
+            )
+        data["cliente"] = client_name
+        validate_quote_data(data)
         data["solicitud"] = data["solicitud"] or date.today().isoformat()
         data["vendedor"] = user["display_name"]
         due_date = _validated_due_date(
@@ -578,8 +640,8 @@ def create():
                 cursor = database.execute(
                     """INSERT INTO quotes(
                     number,owner_id,created_at,last_user_edit_at,data,fingerprint,
-                    request_status,due_date
-                    ) VALUES(?,?,?,?,?,?,?,?)""",
+                    request_status,due_date,client_id
+                    ) VALUES(?,?,?,?,?,?,?,?,?)""",
                     (
                         f"TEMP-{secrets.token_hex(8)}",
                         user["id"],
@@ -589,6 +651,7 @@ def create():
                         quote_fingerprint(data),
                         "pendiente_asignacion",
                         due_date,
+                        client_id,
                     ),
                 )
                 quote_id = cursor.lastrowid
@@ -631,6 +694,7 @@ def create():
         allowed_statuses=available_statuses,
         is_request_form=True,
         catalogs=active_catalog_options(),
+        client_options=request_clients(user),
     )
 
 
@@ -901,25 +965,31 @@ def edit(quote_id):
     current_data = json.loads(quote["data"])
     available_statuses = allowed_statuses(current_data.get("estado", ""), user)
     if request.method == "POST":
-        data = form_data()
-        for key in COMMERCIAL_SUMMARY_FIELDS:
-            data[key] = current_data.get(key, "")
         request_only_fields = {
             "csrf",
             "version",
             "solicitud",
             "due_date",
+            "client_id",
             "cliente",
             "descripcion",
         }
         is_simple_request = quote["request_status"] == "pendiente_asignacion" and set(
             request.form
         ).issubset(request_only_fields)
+        data = form_data(validate=not is_simple_request)
+        for key in COMMERCIAL_SUMMARY_FIELDS:
+            data[key] = current_data.get(key, "")
+        selected_client_id = quote["client_id"]
         if is_simple_request:
+            with connection() as database:
+                selected_client_id, client_name = resolve_request_client(
+                    database, user, data["cliente"]
+                )
             data = current_data | {
                 "solicitud": data["solicitud"] or current_data.get("solicitud", ""),
                 "vendedor": current_data.get("vendedor", user["username"]),
-                "cliente": data["cliente"],
+                "cliente": client_name,
                 "descripcion": data["descripcion"],
             }
             validate_quote_data(data)
@@ -960,7 +1030,7 @@ def edit(quote_id):
                 timestamp if user["role"] == "usuario" else fresh["last_user_edit_at"]
             )
             cursor = database.execute(
-                """UPDATE quotes SET data=?,last_user_edit_at=?,due_date=?,
+                """UPDATE quotes SET data=?,last_user_edit_at=?,due_date=?,client_id=?,
                 version=version+1,fingerprint=?,workflow_status='borrador',
                 approved_by=NULL,approved_at=NULL,approved_version=NULL,sent_at=NULL,
                 request_status=CASE
@@ -973,6 +1043,7 @@ def edit(quote_id):
                     serialized,
                     last_user_edit_at,
                     due_date,
+                    selected_client_id,
                     quote_fingerprint(data),
                     quote_id,
                     submitted_version,
@@ -1018,6 +1089,7 @@ def edit(quote_id):
         allowed_statuses=available_statuses,
         is_request_form=quote["request_status"] == "pendiente_asignacion",
         catalogs=active_catalog_options(),
+        client_options=request_clients(user, quote["client_id"]),
     )
 
 

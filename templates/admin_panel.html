@@ -21,6 +21,16 @@
   </article>
 
   <article class="admin-module-card">
+    <div class="admin-module-icon" aria-hidden="true">CL</div>
+    <div class="admin-module-copy">
+      <h2>Clientes</h2>
+      <p>Registra clientes y define qué vendedores pueden generar solicitudes para cada uno.</p>
+      <span class="admin-module-meta">{{summary.clients}} clientes activos</span>
+    </div>
+    <a class="btn" href="{{url_for('admin.clients')}}">Gestionar clientes</a>
+  </article>
+
+  <article class="admin-module-card">
     <div class="admin-module-icon" aria-hidden="true">US</div>
     <div class="admin-module-copy">
       <h2>Usuarios</h2>

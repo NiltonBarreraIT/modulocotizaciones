@@ -85,6 +85,7 @@ class PhaseOneTests(unittest.TestCase):
                 "019_user_profiles",
                 "020_master_catalogs",
                 "021_password_change_required",
+                "022_clients_and_portfolios",
             ],
         )
 
