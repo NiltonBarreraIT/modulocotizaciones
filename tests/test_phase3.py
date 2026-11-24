@@ -13,6 +13,7 @@ from werkzeug.security import generate_password_hash
 from cotizaciones import create_app
 from cotizaciones.db import connection
 from cotizaciones.deadlines import local_today
+from cotizaciones.word_pdf import PdfConversionError
 
 
 class PhaseThreeTests(unittest.TestCase):
@@ -228,6 +229,21 @@ class PhaseThreeTests(unittest.TestCase):
         self.assertTrue(generated_docx.getvalue().startswith(b"PK"))
         self.assertIn(
             "Oferta-Comercial.pdf", pdf.headers.get("Content-Disposition", "")
+        )
+
+        with patch(
+            "cotizaciones.commercial.convert_docx_to_pdf",
+            side_effect=PdfConversionError(
+                "Microsoft Word requiere PowerShell para generar la oferta PDF"
+            ),
+        ):
+            portable_pdf = client.get(f"/quote/{quote_id}/pdf")
+        self.assertEqual(portable_pdf.status_code, 200)
+        self.assertEqual(portable_pdf.mimetype, "application/pdf")
+        self.assertTrue(portable_pdf.data.startswith(b"%PDF"))
+        self.assertIn(
+            "Oferta-Comercial.pdf",
+            portable_pdf.headers.get("Content-Disposition", ""),
         )
 
         word = client.get(f"/quote/{quote_id}/offer.docx")

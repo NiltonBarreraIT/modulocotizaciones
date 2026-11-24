@@ -28,6 +28,7 @@ from .commercial_service import (
 from .db import connection, iso
 from .deadlines import local_today
 from .offer_docx import build_offer_docx
+from .pdf_builder import build_quote_pdf
 from .quotes import (
     can_access_quote,
     editable,
@@ -575,6 +576,7 @@ def version_detail(quote_id, version):
 @login_required
 def quote_pdf(quote_id):
     quote, _ = _authorized_quote(quote_id)
+    loaded_quote = load_quote(quote)
     template = Path(current_app.config["COMMERCIAL_OFFER_TEMPLATE"])
     if not template.is_file():
         abort(500, "No se encontró el formato oficial de oferta comercial")
@@ -585,12 +587,16 @@ def quote_pdf(quote_id):
         items = get_items(database, quote_id)
     if not items:
         abort(400, "Agregue al menos una línea en el detalle comercial")
-    offer_docx = build_offer_docx(load_quote(quote), commercial, items, template)
+    offer_docx = build_offer_docx(loaded_quote, commercial, items, template)
     try:
         content = convert_docx_to_pdf(offer_docx)
     except PdfConversionError as error:
-        current_app.logger.exception("No fue posible convertir la oferta a PDF")
-        abort(503, str(error))
+        current_app.logger.warning(
+            "No fue posible convertir la oferta con Microsoft Word; "
+            "se usará el generador PDF nativo: %s",
+            error,
+        )
+        content = build_quote_pdf(loaded_quote, commercial, items)
     return send_file(
         content,
         as_attachment=True,
