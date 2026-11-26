@@ -61,6 +61,7 @@ class PhaseTwoTests(unittest.TestCase):
             "csrf": token,
             "cliente": client_name,
             "descripcion": f"Descripción de {client_name}",
+            "client_contact_name": "Contacto Cliente",
             "client_email": "contacto@cliente.cl",
         } | extra
         response = client.post("/new", data=payload)

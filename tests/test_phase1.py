@@ -87,6 +87,7 @@ class PhaseOneTests(unittest.TestCase):
                 "021_password_change_required",
                 "022_clients_and_portfolios",
                 "023_quote_client_contact",
+                "024_quote_client_contact_name",
             ],
         )
 
@@ -106,6 +107,7 @@ class PhaseOneTests(unittest.TestCase):
                 "csrf": owner_csrf,
                 "cliente": "Cliente privado",
                 "descripcion": "Descripción",
+                "client_contact_name": "Contacto Cliente",
                 "client_email": "contacto@cliente.cl",
             },
         )
@@ -210,6 +212,7 @@ class PhaseOneTests(unittest.TestCase):
                 "csrf": owner_csrf,
                 "cliente": "Cliente",
                 "descripcion": "Descripción",
+                "client_contact_name": "Contacto Cliente",
                 "client_email": "contacto@cliente.cl",
             },
         )

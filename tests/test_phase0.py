@@ -80,6 +80,7 @@ class PhaseZeroTests(unittest.TestCase):
             "csrf": token,
             "cliente": "Cliente",
             "descripcion": "Descripción",
+            "client_contact_name": "Contacto Cliente",
             "client_email": "contacto@cliente.cl",
         }
 
@@ -122,6 +123,7 @@ class PhaseZeroTests(unittest.TestCase):
                 "solicitud": "2026-11-17",
                 "cliente": "Cliente fecha",
                 "descripcion": "Validar formato visible de fechas",
+                "client_contact_name": "Contacto Cliente",
                 "client_email": "contacto@cliente.cl",
             },
         )
@@ -138,6 +140,7 @@ class PhaseZeroTests(unittest.TestCase):
                 "csrf": token,
                 "cliente": "=2+2",
                 "descripcion": "Descripción",
+                "client_contact_name": "Contacto Cliente",
                 "client_email": "contacto@cliente.cl",
             },
         )

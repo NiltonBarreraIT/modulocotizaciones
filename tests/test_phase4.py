@@ -77,6 +77,7 @@ class PhaseFourTests(unittest.TestCase):
         form = client.get("/new").get_data(as_text=True)
         self.assertIn("Nueva solicitud de cotización", form)
         self.assertIn("Requerimiento o comentarios", form)
+        self.assertIn('name="client_contact_name"', form)
         self.assertIn('name="client_email"', form)
         self.assertIn('name="client_phone"', form)
         self.assertNotIn("Monto CLP", form)
@@ -91,6 +92,7 @@ class PhaseFourTests(unittest.TestCase):
                 "vendedor": "usuario-manipulado",
                 "cliente": "Cliente fase 4",
                 "descripcion": "Preparar una propuesta técnica y comercial.",
+                "client_contact_name": "Camila Cliente",
                 "client_email": "contacto.fase4@cliente.cl",
                 "client_phone": "+56 9 1234 5678",
                 "file": (BytesIO(b"documento de respaldo"), "antecedentes.docx"),
@@ -121,6 +123,7 @@ class PhaseFourTests(unittest.TestCase):
         self.assertEqual(data["vendedor"], "vendedor1")
         self.assertEqual(data["solicitud"], "2026-11-17")
         self.assertEqual(data["estado"], "")
+        self.assertEqual(quote["client_contact_name"], "Camila Cliente")
         self.assertEqual(quote["client_email"], "contacto.fase4@cliente.cl")
         self.assertEqual(quote["client_phone"], "+56 9 1234 5678")
         self.assertEqual(attachment["original_name"], "antecedentes.docx")
@@ -130,6 +133,7 @@ class PhaseFourTests(unittest.TestCase):
         self.assertIn("Pendiente de asignación", detail)
         self.assertIn("Solo lectura", detail)
         self.assertIn("antecedentes.docx", detail)
+        self.assertIn("Camila Cliente", detail)
         self.assertIn("contacto.fase4@cliente.cl", detail)
         self.assertIn("+56 9 1234 5678", detail)
         self.assertIn("creó la solicitud", detail)
@@ -145,13 +149,24 @@ class PhaseFourTests(unittest.TestCase):
             "csrf": token,
             "cliente": "Cliente contacto",
             "descripcion": "Solicitud con datos de contacto",
+            "client_contact_name": "Contacto Cliente",
         }
 
+        missing_name = client.post(
+            "/new",
+            data={
+                "csrf": token,
+                "cliente": "Cliente contacto",
+                "descripcion": "Solicitud sin nombre de contacto",
+                "client_email": "contacto@cliente.cl",
+            },
+        )
         missing = client.post("/new", data=base)
         invalid = client.post(
             "/new", data=base | {"client_email": "correo-invalido"}
         )
 
+        self.assertEqual(missing_name.status_code, 400)
         self.assertEqual(missing.status_code, 400)
         self.assertEqual(invalid.status_code, 400)
         with self.app.app_context(), connection() as database:
@@ -166,6 +181,7 @@ class PhaseFourTests(unittest.TestCase):
                 "csrf": token,
                 "cliente": "Cliente inválido",
                 "descripcion": "Solicitud con adjunto no permitido",
+                "client_contact_name": "Contacto Cliente",
                 "client_email": "contacto@cliente.cl",
                 "file": (BytesIO(b"contenido"), "archivo.exe"),
             },
@@ -184,6 +200,7 @@ class PhaseFourTests(unittest.TestCase):
                 "csrf": token,
                 "cliente": "Cliente seguimiento",
                 "descripcion": "Solicitud que requiere seguimiento comercial",
+                "client_contact_name": "Contacto Cliente",
                 "client_email": "contacto@cliente.cl",
             },
         )

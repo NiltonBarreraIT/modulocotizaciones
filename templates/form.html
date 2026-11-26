@@ -41,6 +41,11 @@
         <p class="muted field-help">Si no hay un compromiso de entrega, puede quedar vacía.</p>
       </div>
       <div>
+        <label for="client-contact-name">Nombre del cliente</label>
+        <input id="client-contact-name" name="client_contact_name" type="text" maxlength="150" autocomplete="name" value="{{values.get('client_contact_name','')}}" required placeholder="Nombre y apellido">
+        <p class="muted field-help">Obligatorio. Persona de contacto para esta solicitud.</p>
+      </div>
+      <div>
         <label for="client-email">Correo del cliente</label>
         <input id="client-email" name="client_email" type="email" maxlength="254" autocomplete="email" value="{{values.get('client_email','')}}" required placeholder="contacto@cliente.cl">
         <p class="muted field-help">Obligatorio. Se utilizará como contacto de esta solicitud.</p>

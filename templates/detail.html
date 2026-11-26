@@ -60,6 +60,7 @@
     <div><label>Fecha de solicitud</label><div>{{q.d.solicitud|local_date if q.d.solicitud else '—'}}</div></div>
     <div><label>Vendedor</label><div>{{q.d.vendedor or '—'}}</div></div>
     <div><label>Cliente</label><div>{{q.d.cliente or '—'}}</div></div>
+    <div><label>Nombre del cliente</label><div>{{q.client_contact_name or '—'}}</div></div>
     <div><label>Correo del cliente</label><div>{% if q.client_email %}<a href="mailto:{{q.client_email}}">{{q.client_email}}</a>{% else %}—{% endif %}</div></div>
     <div><label>Teléfono del cliente</label><div>{{q.client_phone or '—'}}</div></div>
     <div class="wide"><label>Requerimiento o comentarios</label><div class="request-description">{{q.d.descripcion or '—'}}</div></div>
@@ -72,6 +73,7 @@
     <div><label>{{label}}</label><div>{% if key in ['solicitud','fecha'] and q.d.get(key) %}{{q.d.get(key)|local_date}}{% elif key in ['clp','usd','eur'] and q.d.get(key) %}{{format_amount(q.d.get(key),key.upper())}}{% elif key=='utilidad_usd' and q.d.get(key) %}{{format_amount(q.d.get(key),'USD')}}{% elif key=='margen' and q.d.get(key) %}{{q.d.get(key)}}%{% else %}{{q.d.get(key,'—') or '—'}}{% endif %}</div></div>
     {% endif %}
     {% endfor %}
+    <div><label>Nombre del cliente</label><div>{{q.client_contact_name or '—'}}</div></div>
     <div><label>Correo del cliente</label><div>{% if q.client_email %}<a href="mailto:{{q.client_email}}">{{q.client_email}}</a>{% else %}—{% endif %}</div></div>
     <div><label>Teléfono del cliente</label><div>{{q.client_phone or '—'}}</div></div>
   </div>

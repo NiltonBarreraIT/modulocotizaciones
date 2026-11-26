@@ -110,6 +110,7 @@ class ClientPortfolioTests(unittest.TestCase):
                 "csrf": seller_token,
                 "client_id": client_ids["Cliente Norte"],
                 "descripcion": "Solicitud autorizada",
+                "client_contact_name": "María Compras",
                 "client_email": "compras@norte.cl",
                 "client_phone": "+56 2 2345 6789",
             },
@@ -117,10 +118,12 @@ class ClientPortfolioTests(unittest.TestCase):
         self.assertEqual(allowed.status_code, 302)
         with self.app.app_context(), connection() as database:
             quote = database.execute(
-                "SELECT id,version,client_id,data,client_email,client_phone FROM quotes"
+                """SELECT id,version,client_id,data,client_contact_name,
+                client_email,client_phone FROM quotes"""
             ).fetchone()
             self.assertEqual(quote["client_id"], client_ids["Cliente Norte"])
             self.assertIn("Cliente Norte", quote["data"])
+            self.assertEqual(quote["client_contact_name"], "María Compras")
             self.assertEqual(quote["client_email"], "compras@norte.cl")
             self.assertEqual(quote["client_phone"], "+56 2 2345 6789")
 
@@ -133,6 +136,7 @@ class ClientPortfolioTests(unittest.TestCase):
                 "client_id": client_ids["Cliente Norte"],
                 "solicitud": "2026-11-26",
                 "descripcion": "Solicitud autorizada actualizada",
+                "client_contact_name": "Pedro Proyectos",
                 "client_email": "proyectos@norte.cl",
                 "client_phone": "",
             },
@@ -140,9 +144,11 @@ class ClientPortfolioTests(unittest.TestCase):
         self.assertEqual(edited.status_code, 302)
         with self.app.app_context(), connection() as database:
             updated = database.execute(
-                "SELECT client_email,client_phone FROM quotes WHERE id=?",
+                """SELECT client_contact_name,client_email,client_phone
+                FROM quotes WHERE id=?""",
                 (quote["id"],),
             ).fetchone()
+        self.assertEqual(updated["client_contact_name"], "Pedro Proyectos")
         self.assertEqual(updated["client_email"], "proyectos@norte.cl")
         self.assertEqual(updated["client_phone"], "")
 
@@ -152,6 +158,7 @@ class ClientPortfolioTests(unittest.TestCase):
                 "csrf": seller_token,
                 "client_id": client_ids["Cliente Sur"],
                 "descripcion": "Intento fuera de cartera",
+                "client_contact_name": "Contacto Sur",
                 "client_email": "contacto@sur.cl",
             },
         )
