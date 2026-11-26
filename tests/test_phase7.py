@@ -143,6 +143,7 @@ class PhaseSevenTests(unittest.TestCase):
                 "due_date": due_date,
                 "cliente": name,
                 "descripcion": f"Solicitud para {name}",
+                "client_email": "contacto@cliente.cl",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -420,6 +421,7 @@ class PhaseSevenTests(unittest.TestCase):
                 "due_date": "2026-11-16",
                 "cliente": "Plazo inválido",
                 "descripcion": "La fecha no debe aceptarse",
+                "client_email": "contacto@cliente.cl",
             },
         )
         self.assertEqual(invalid.status_code, 400)

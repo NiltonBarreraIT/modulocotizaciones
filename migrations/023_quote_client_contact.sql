@@ -1,0 +1,2 @@
+ALTER TABLE quotes ADD COLUMN client_email TEXT NOT NULL DEFAULT '';
+ALTER TABLE quotes ADD COLUMN client_phone TEXT NOT NULL DEFAULT '';

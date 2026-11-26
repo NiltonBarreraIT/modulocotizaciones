@@ -76,7 +76,12 @@ class PhaseZeroTests(unittest.TestCase):
     def test_quote_validation_and_security_headers(self):
         client = self.app.test_client()
         token = self.login(client)
-        base = {"csrf": token, "cliente": "Cliente", "descripcion": "Descripción"}
+        base = {
+            "csrf": token,
+            "cliente": "Cliente",
+            "descripcion": "Descripción",
+            "client_email": "contacto@cliente.cl",
+        }
 
         invalid_values = (
             {"estado": "Manipulado"},
@@ -117,6 +122,7 @@ class PhaseZeroTests(unittest.TestCase):
                 "solicitud": "2026-11-17",
                 "cliente": "Cliente fecha",
                 "descripcion": "Validar formato visible de fechas",
+                "client_email": "contacto@cliente.cl",
             },
         )
         detail = client.get(response.headers["Location"]).get_data(as_text=True)
@@ -128,7 +134,12 @@ class PhaseZeroTests(unittest.TestCase):
         token = self.login(client)
         response = client.post(
             "/new",
-            data={"csrf": token, "cliente": "=2+2", "descripcion": "Descripción"},
+            data={
+                "csrf": token,
+                "cliente": "=2+2",
+                "descripcion": "Descripción",
+                "client_email": "contacto@cliente.cl",
+            },
         )
         self.assertEqual(response.status_code, 302)
 

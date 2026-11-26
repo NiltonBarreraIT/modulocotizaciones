@@ -90,6 +90,7 @@ class PhaseThreeTests(unittest.TestCase):
                 "csrf": token,
                 "cliente": name,
                 "descripcion": "Solución tecnológica integral",
+                "client_email": "contacto@cliente.cl",
                 "vendedor": "Ana Comercial",
                 "rfq": "RFQ-300",
                 "fecha": "2026-11-17",

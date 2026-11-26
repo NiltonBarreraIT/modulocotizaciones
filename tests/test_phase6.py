@@ -85,6 +85,7 @@ class PhaseSixTests(unittest.TestCase):
                 "csrf": seller_token,
                 "cliente": "Cliente fase 6",
                 "descripcion": "Oferta comercial con el formato corporativo.",
+                "client_email": "contacto@cliente.cl",
             },
         )
         quote_id = int(response.headers["Location"].rsplit("/", 1)[-1])

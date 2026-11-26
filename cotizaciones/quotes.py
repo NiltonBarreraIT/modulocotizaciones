@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import secrets
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -171,6 +172,18 @@ def validate_quote_data(data):
 def form_data(*, validate=True):
     data = {key: request.form.get(key, "").strip() for key, _, _ in FIELDS}
     return validate_quote_data(data) if validate else data
+
+
+def request_contact_data():
+    email = request.form.get("client_email", "").strip().lower()
+    phone = request.form.get("client_phone", "").strip()
+    if not email:
+        abort(400, "El correo del cliente es obligatorio")
+    if len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        abort(400, "Correo del cliente inválido")
+    if len(phone) > 50:
+        abort(400, "El teléfono del cliente no puede superar 50 caracteres")
+    return email, phone
 
 
 def request_clients(user, current_client_id=None):
@@ -618,6 +631,7 @@ def create():
     available_statuses = allowed_statuses("", user, creating=True)
     if request.method == "POST":
         data = form_data(validate=False)
+        client_email, client_phone = request_contact_data()
         with connection() as database:
             client_id, client_name = resolve_request_client(
                 database, user, data["cliente"]
@@ -640,8 +654,8 @@ def create():
                 cursor = database.execute(
                     """INSERT INTO quotes(
                     number,owner_id,created_at,last_user_edit_at,data,fingerprint,
-                    request_status,due_date,client_id
-                    ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                    request_status,due_date,client_id,client_email,client_phone
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         f"TEMP-{secrets.token_hex(8)}",
                         user["id"],
@@ -652,6 +666,8 @@ def create():
                         "pendiente_asignacion",
                         due_date,
                         client_id,
+                        client_email,
+                        client_phone,
                     ),
                 )
                 quote_id = cursor.lastrowid
@@ -973,6 +989,8 @@ def edit(quote_id):
             "client_id",
             "cliente",
             "descripcion",
+            "client_email",
+            "client_phone",
         }
         is_simple_request = quote["request_status"] == "pendiente_asignacion" and set(
             request.form
@@ -981,7 +999,10 @@ def edit(quote_id):
         for key in COMMERCIAL_SUMMARY_FIELDS:
             data[key] = current_data.get(key, "")
         selected_client_id = quote["client_id"]
+        client_email = quote["client_email"]
+        client_phone = quote["client_phone"]
         if is_simple_request:
+            client_email, client_phone = request_contact_data()
             with connection() as database:
                 selected_client_id, client_name = resolve_request_client(
                     database, user, data["cliente"]
@@ -1031,6 +1052,7 @@ def edit(quote_id):
             )
             cursor = database.execute(
                 """UPDATE quotes SET data=?,last_user_edit_at=?,due_date=?,client_id=?,
+                client_email=?,client_phone=?,
                 version=version+1,fingerprint=?,workflow_status='borrador',
                 approved_by=NULL,approved_at=NULL,approved_version=NULL,sent_at=NULL,
                 request_status=CASE
@@ -1044,6 +1066,8 @@ def edit(quote_id):
                     last_user_edit_at,
                     due_date,
                     selected_client_id,
+                    client_email,
+                    client_phone,
                     quote_fingerprint(data),
                     quote_id,
                     submitted_version,
@@ -1084,7 +1108,12 @@ def edit(quote_id):
     return render_template(
         "form.html",
         q=load_quote(quote),
-        values=current_data | {"due_date": quote["due_date"] or ""},
+        values=current_data
+        | {
+            "due_date": quote["due_date"] or "",
+            "client_email": quote["client_email"],
+            "client_phone": quote["client_phone"],
+        },
         title="Editar " + quote["number"],
         allowed_statuses=available_statuses,
         is_request_form=quote["request_status"] == "pendiente_asignacion",
@@ -1106,6 +1135,8 @@ def export():
         ["Número"]
         + [label for _, label, _ in FIELDS]
         + [
+            "Correo cliente",
+            "Teléfono cliente",
             "Estado solicitud",
             "Fecha límite",
             "Creado (hora Santiago)",
@@ -1152,6 +1183,8 @@ def export():
                 for key, _, _ in FIELDS
             ]
             + [
+                excel_safe(quote["client_email"]),
+                excel_safe(quote["client_phone"]),
                 REQUEST_STATUS_LABELS.get(
                     quote["request_status"], quote["request_status"]
                 ),

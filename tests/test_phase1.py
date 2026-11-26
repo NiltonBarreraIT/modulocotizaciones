@@ -86,6 +86,7 @@ class PhaseOneTests(unittest.TestCase):
                 "020_master_catalogs",
                 "021_password_change_required",
                 "022_clients_and_portfolios",
+                "023_quote_client_contact",
             ],
         )
 
@@ -105,6 +106,7 @@ class PhaseOneTests(unittest.TestCase):
                 "csrf": owner_csrf,
                 "cliente": "Cliente privado",
                 "descripcion": "Descripción",
+                "client_email": "contacto@cliente.cl",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -208,6 +210,7 @@ class PhaseOneTests(unittest.TestCase):
                 "csrf": owner_csrf,
                 "cliente": "Cliente",
                 "descripcion": "Descripción",
+                "client_email": "contacto@cliente.cl",
             },
         )
         quote_id = int(response.headers["Location"].rsplit("/", 1)[-1])

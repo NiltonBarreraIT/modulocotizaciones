@@ -40,6 +40,15 @@
         <input id="due-date" name="due_date" type="date" min="{{values.get('solicitud','')}}" value="{{values.get('due_date','')}}">
         <p class="muted field-help">Si no hay un compromiso de entrega, puede quedar vacía.</p>
       </div>
+      <div>
+        <label for="client-email">Correo del cliente</label>
+        <input id="client-email" name="client_email" type="email" maxlength="254" autocomplete="email" value="{{values.get('client_email','')}}" required placeholder="contacto@cliente.cl">
+        <p class="muted field-help">Obligatorio. Se utilizará como contacto de esta solicitud.</p>
+      </div>
+      <div>
+        <label for="client-phone">Teléfono del cliente (opcional)</label>
+        <input id="client-phone" name="client_phone" type="tel" maxlength="50" autocomplete="tel" value="{{values.get('client_phone','')}}" placeholder="+56 9 1234 5678">
+      </div>
       <div class="wide">
         <label for="descripcion">Requerimiento o comentarios</label>
         <textarea id="descripcion" name="descripcion" rows="8" maxlength="5000" required placeholder="Describe todo lo que el cliente necesita cotizar">{{values.get('descripcion','')}}</textarea>

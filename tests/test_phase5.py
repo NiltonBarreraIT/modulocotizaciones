@@ -72,6 +72,7 @@ class PhaseFiveTests(unittest.TestCase):
                 "solicitud": "2026-11-17",
                 "cliente": "Cliente asignación",
                 "descripcion": "Preparar cotización de instrumentación.",
+                "client_email": "contacto@cliente.cl",
             },
         )
         self.assertEqual(response.status_code, 302)

@@ -77,6 +77,8 @@ class PhaseFourTests(unittest.TestCase):
         form = client.get("/new").get_data(as_text=True)
         self.assertIn("Nueva solicitud de cotización", form)
         self.assertIn("Requerimiento o comentarios", form)
+        self.assertIn('name="client_email"', form)
+        self.assertIn('name="client_phone"', form)
         self.assertNotIn("Monto CLP", form)
         self.assertIn("data-platform-revision-url", form)
         initial_revision = client.get("/live/revision").get_json()["revision"]
@@ -89,6 +91,8 @@ class PhaseFourTests(unittest.TestCase):
                 "vendedor": "usuario-manipulado",
                 "cliente": "Cliente fase 4",
                 "descripcion": "Preparar una propuesta técnica y comercial.",
+                "client_email": "contacto.fase4@cliente.cl",
+                "client_phone": "+56 9 1234 5678",
                 "file": (BytesIO(b"documento de respaldo"), "antecedentes.docx"),
             },
             content_type="multipart/form-data",
@@ -117,6 +121,8 @@ class PhaseFourTests(unittest.TestCase):
         self.assertEqual(data["vendedor"], "vendedor1")
         self.assertEqual(data["solicitud"], "2026-11-17")
         self.assertEqual(data["estado"], "")
+        self.assertEqual(quote["client_email"], "contacto.fase4@cliente.cl")
+        self.assertEqual(quote["client_phone"], "+56 9 1234 5678")
         self.assertEqual(attachment["original_name"], "antecedentes.docx")
         self.assertEqual(event["action"], "crear_solicitud")
 
@@ -124,12 +130,33 @@ class PhaseFourTests(unittest.TestCase):
         self.assertIn("Pendiente de asignación", detail)
         self.assertIn("Solo lectura", detail)
         self.assertIn("antecedentes.docx", detail)
+        self.assertIn("contacto.fase4@cliente.cl", detail)
+        self.assertIn("+56 9 1234 5678", detail)
         self.assertIn("creó la solicitud", detail)
         self.assertNotIn("crear_solicitud", detail)
         listing = client.get("/?request_status=pendiente_asignacion").get_data(
             as_text=True
         )
         self.assertIn("Cliente fase 4", listing)
+
+    def test_client_email_is_required_and_validated_by_server(self):
+        client, token = self.login()
+        base = {
+            "csrf": token,
+            "cliente": "Cliente contacto",
+            "descripcion": "Solicitud con datos de contacto",
+        }
+
+        missing = client.post("/new", data=base)
+        invalid = client.post(
+            "/new", data=base | {"client_email": "correo-invalido"}
+        )
+
+        self.assertEqual(missing.status_code, 400)
+        self.assertEqual(invalid.status_code, 400)
+        with self.app.app_context(), connection() as database:
+            count = database.execute("SELECT count(*) FROM quotes").fetchone()[0]
+        self.assertEqual(count, 0)
 
     def test_invalid_initial_attachment_does_not_create_request(self):
         client, token = self.login()
@@ -139,6 +166,7 @@ class PhaseFourTests(unittest.TestCase):
                 "csrf": token,
                 "cliente": "Cliente inválido",
                 "descripcion": "Solicitud con adjunto no permitido",
+                "client_email": "contacto@cliente.cl",
                 "file": (BytesIO(b"contenido"), "archivo.exe"),
             },
             content_type="multipart/form-data",
@@ -156,6 +184,7 @@ class PhaseFourTests(unittest.TestCase):
                 "csrf": token,
                 "cliente": "Cliente seguimiento",
                 "descripcion": "Solicitud que requiere seguimiento comercial",
+                "client_email": "contacto@cliente.cl",
             },
         )
         quote_id = int(response.headers["Location"].rsplit("/", 1)[-1])

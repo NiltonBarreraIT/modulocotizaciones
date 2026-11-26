@@ -110,13 +110,41 @@ class ClientPortfolioTests(unittest.TestCase):
                 "csrf": seller_token,
                 "client_id": client_ids["Cliente Norte"],
                 "descripcion": "Solicitud autorizada",
+                "client_email": "compras@norte.cl",
+                "client_phone": "+56 2 2345 6789",
             },
         )
         self.assertEqual(allowed.status_code, 302)
         with self.app.app_context(), connection() as database:
-            quote = database.execute("SELECT client_id,data FROM quotes").fetchone()
+            quote = database.execute(
+                "SELECT id,version,client_id,data,client_email,client_phone FROM quotes"
+            ).fetchone()
             self.assertEqual(quote["client_id"], client_ids["Cliente Norte"])
             self.assertIn("Cliente Norte", quote["data"])
+            self.assertEqual(quote["client_email"], "compras@norte.cl")
+            self.assertEqual(quote["client_phone"], "+56 2 2345 6789")
+
+        admin, admin_token = self.login("admin", "AdminPassword123!")
+        edited = admin.post(
+            f"/quote/{quote['id']}/edit",
+            data={
+                "csrf": admin_token,
+                "version": quote["version"],
+                "client_id": client_ids["Cliente Norte"],
+                "solicitud": "2026-11-26",
+                "descripcion": "Solicitud autorizada actualizada",
+                "client_email": "proyectos@norte.cl",
+                "client_phone": "",
+            },
+        )
+        self.assertEqual(edited.status_code, 302)
+        with self.app.app_context(), connection() as database:
+            updated = database.execute(
+                "SELECT client_email,client_phone FROM quotes WHERE id=?",
+                (quote["id"],),
+            ).fetchone()
+        self.assertEqual(updated["client_email"], "proyectos@norte.cl")
+        self.assertEqual(updated["client_phone"], "")
 
         rejected = seller.post(
             "/new",
@@ -124,6 +152,7 @@ class ClientPortfolioTests(unittest.TestCase):
                 "csrf": seller_token,
                 "client_id": client_ids["Cliente Sur"],
                 "descripcion": "Intento fuera de cartera",
+                "client_email": "contacto@sur.cl",
             },
         )
         self.assertEqual(rejected.status_code, 403)
